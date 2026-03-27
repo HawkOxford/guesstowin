@@ -451,10 +451,18 @@ async function fetchFixtures() {
 }
 
 async function fetchLiveMatches(gw) {
-  // Fetch in-play and finished matches for current weekend
-  const {from,to}=getNextWeekendWindow();
-  const dateFrom=from.toISOString().slice(0,10);
-  const dateTo=to.toISOString().slice(0,10);
+  // Fetch in-play and finished matches for current gameweek window
+  // Use the first match in currentMatches as anchor, Sat-Mon window
+  const anchor=currentMatches.length?new Date(currentMatches[0].utcDate):new Date();
+  const dow=anchor.getDay();
+  const daysBackToSat=dow===6?0:dow===0?1:dow===1?2:6;
+  const sat=new Date(anchor);
+  sat.setDate(anchor.getDate()-daysBackToSat);
+  sat.setHours(0,0,0,0);
+  const sun=new Date(sat);
+  sun.setDate(sat.getDate()+1);
+  const dateFrom=sat.toISOString().slice(0,10);
+  const dateTo=sun.toISOString().slice(0,10);
   const apiUrl=`https://api.football-data.org/v4/competitions/PL/matches?dateFrom=${dateFrom}&dateTo=${dateTo}`;
   const proxyUrl='https://corsproxy.io/?'+encodeURIComponent(apiUrl);
   try {
@@ -479,8 +487,32 @@ function getNextWeekendWindow() {
 }
 
 function filterWeekendMatches(matches) {
-  const {from,to}=getNextWeekendWindow();
-  return matches.filter(m=>{const d=new Date(m.utcDate);return d>=from&&d<=to;});
+  // Find the next upcoming match from now
+  const now=new Date();
+  const upcoming=matches
+    .filter(m=>new Date(m.utcDate)>=now)
+    .sort((a,b)=>new Date(a.utcDate)-new Date(b.utcDate));
+  if(!upcoming.length) return [];
+
+  // Anchor to the first upcoming match
+  const anchor=new Date(upcoming[0].utcDate);
+
+  // Find the Saturday of that round
+  const dow=anchor.getDay(); // 0=Sun,1=Mon,6=Sat
+  const daysBackToSat=dow===6?0:dow===0?1:dow===1?2:6; // Sat->0, Sun->1, Mon->2
+  const sat=new Date(anchor);
+  sat.setDate(anchor.getDate()-daysBackToSat);
+  sat.setHours(0,0,0,0);
+
+  // Window: Saturday and Sunday only
+  const sun=new Date(sat);
+  sun.setDate(sat.getDate()+1);
+  sun.setHours(23,59,59,999);
+
+  return matches.filter(m=>{
+    const d=new Date(m.utcDate);
+    return d>=sat && d<=sun;
+  });
 }
 
 function formatMatchTime(utcDate) {
