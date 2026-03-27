@@ -21,310 +21,88 @@
     --silver: #b0bec5;
     --bronze: #a1734e;
     --red: #ef5350;
+    --amber: #ffa726;
   }
-
   * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { background: var(--bg); color: var(--text); font-family: 'DM Sans', sans-serif; min-height: 100vh; overflow-x: hidden; }
 
-  body {
-    background: var(--bg);
-    color: var(--text);
-    font-family: 'DM Sans', sans-serif;
-    min-height: 100vh;
-    overflow-x: hidden;
-  }
-
-  #auth-screen {
-    min-height: 100vh;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    padding: 2rem;
-  }
-
-  .auth-card {
-    background: var(--card);
-    border: 1px solid var(--border);
-    border-radius: 16px;
-    padding: 2.5rem;
-    width: 100%;
-    max-width: 400px;
-  }
-
-  .auth-logo {
-    font-family: 'Bebas Neue', sans-serif;
-    font-size: 3rem;
-    line-height: 0.9;
-    margin-bottom: 0.3rem;
-  }
-
+  /* Auth */
+  #auth-screen { min-height: 100vh; display: flex; align-items: center; justify-content: center; padding: 2rem; }
+  .auth-card { background: var(--card); border: 1px solid var(--border); border-radius: 16px; padding: 2.5rem; width: 100%; max-width: 400px; }
+  .auth-logo { font-family: 'Bebas Neue', sans-serif; font-size: 3rem; line-height: 0.9; margin-bottom: 0.3rem; }
   .auth-logo span { color: var(--green); }
-
-  .auth-subtitle {
-    font-size: 0.75rem;
-    color: var(--muted);
-    margin-bottom: 2rem;
-  }
-
-  .auth-label {
-    font-size: 0.72rem;
-    font-weight: 700;
-    letter-spacing: 0.1em;
-    text-transform: uppercase;
-    color: var(--muted);
-    display: block;
-    margin-bottom: 0.4rem;
-  }
-
-  .auth-input, .auth-select {
-    width: 100%;
-    background: var(--bg3);
-    border: 1px solid var(--border);
-    border-radius: 8px;
-    color: var(--text);
-    font-family: 'DM Sans', sans-serif;
-    font-size: 0.95rem;
-    padding: 0.75rem 1rem;
-    margin-bottom: 1.2rem;
-    transition: border-color 0.15s;
-    appearance: none;
-  }
-
+  .auth-subtitle { font-size: 0.75rem; color: var(--muted); margin-bottom: 2rem; }
+  .auth-label { font-size: 0.72rem; font-weight: 700; letter-spacing: 0.1em; text-transform: uppercase; color: var(--muted); display: block; margin-bottom: 0.4rem; }
+  .auth-input, .auth-select { width: 100%; background: var(--bg3); border: 1px solid var(--border); border-radius: 8px; color: var(--text); font-family: 'DM Sans', sans-serif; font-size: 0.95rem; padding: 0.75rem 1rem; margin-bottom: 1.2rem; transition: border-color 0.15s; appearance: none; }
   .auth-select option { background: #1a231a; }
-
-  .auth-input:focus, .auth-select:focus {
-    outline: none;
-    border-color: var(--green);
-  }
-
-  .auth-btn {
-    width: 100%;
-    background: var(--green);
-    color: #031a03;
-    border: none;
-    border-radius: 8px;
-    padding: 0.85rem;
-    font-family: 'DM Sans', sans-serif;
-    font-weight: 700;
-    font-size: 0.95rem;
-    cursor: pointer;
-    transition: all 0.15s;
-    margin-bottom: 1rem;
-  }
-
+  .auth-input:focus, .auth-select:focus { outline: none; border-color: var(--green); }
+  .auth-btn { width: 100%; background: var(--green); color: #031a03; border: none; border-radius: 8px; padding: 0.85rem; font-family: 'DM Sans', sans-serif; font-weight: 700; font-size: 0.95rem; cursor: pointer; transition: all 0.15s; margin-bottom: 1rem; }
   .auth-btn:hover { background: #00ff88; }
   .auth-btn:disabled { opacity: 0.5; cursor: not-allowed; }
-
-  .auth-toggle {
-    text-align: center;
-    font-size: 0.8rem;
-    color: var(--muted);
-  }
-
+  .auth-toggle { text-align: center; font-size: 0.8rem; color: var(--muted); }
   .auth-toggle a { color: var(--green); cursor: pointer; text-decoration: none; }
+  .auth-error { background: rgba(239,83,80,0.1); border: 1px solid rgba(239,83,80,0.3); border-radius: 6px; padding: 0.6rem 0.9rem; font-size: 0.78rem; color: var(--red); margin-bottom: 1rem; display: none; }
+  .auth-success { background: rgba(0,230,118,0.08); border: 1px solid rgba(0,230,118,0.2); border-radius: 6px; padding: 0.6rem 0.9rem; font-size: 0.78rem; color: var(--green); margin-bottom: 1rem; display: none; }
 
-  .auth-error {
-    background: rgba(239,83,80,0.1);
-    border: 1px solid rgba(239,83,80,0.3);
-    border-radius: 6px;
-    padding: 0.6rem 0.9rem;
-    font-size: 0.78rem;
-    color: var(--red);
-    margin-bottom: 1rem;
-    display: none;
-  }
-
-  .auth-success {
-    background: rgba(0,230,118,0.08);
-    border: 1px solid rgba(0,230,118,0.2);
-    border-radius: 6px;
-    padding: 0.6rem 0.9rem;
-    font-size: 0.78rem;
-    color: var(--green);
-    margin-bottom: 1rem;
-    display: none;
-  }
-
+  /* App */
   #app-screen { display: none; }
-
-  header {
-    border-bottom: 1px solid var(--border);
-    background: linear-gradient(180deg, #0d150d 0%, var(--bg) 100%);
-    padding: 1.5rem 2rem 0;
-  }
-
-  .header-top {
-    max-width: 1100px;
-    margin: 0 auto;
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    flex-wrap: wrap;
-    gap: 1rem;
-    margin-bottom: 1rem;
-  }
-
+  header { border-bottom: 1px solid var(--border); background: linear-gradient(180deg, #0d150d 0%, var(--bg) 100%); padding: 1.5rem 2rem 0; }
+  .header-top { max-width: 1100px; margin: 0 auto; display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 1rem; margin-bottom: 1rem; }
   .logo-group { display: flex; align-items: baseline; gap: 1rem; }
-
-  h1 {
-    font-family: 'Bebas Neue', sans-serif;
-    font-size: clamp(2rem, 5vw, 3.5rem);
-    line-height: 1;
-  }
-
+  h1 { font-family: 'Bebas Neue', sans-serif; font-size: clamp(2rem, 5vw, 3.5rem); line-height: 1; }
   h1 span { color: var(--green); }
-
   .season-badge { font-size: 0.7rem; color: var(--muted); }
-
   .user-area { display: flex; align-items: center; gap: 1rem; flex-wrap: wrap; }
-
-  .user-pill {
-    background: var(--bg3);
-    border: 1px solid var(--border);
-    border-radius: 20px;
-    padding: 0.35rem 0.9rem;
-    font-size: 0.8rem;
-    display: flex;
-    align-items: center;
-    gap: 0.5rem;
-  }
-
+  .user-pill { background: var(--bg3); border: 1px solid var(--border); border-radius: 20px; padding: 0.35rem 0.9rem; font-size: 0.8rem; display: flex; align-items: center; gap: 0.5rem; }
   .user-dot { width: 7px; height: 7px; background: var(--green); border-radius: 50%; }
-
-  .sign-out-btn {
-    background: transparent;
-    border: 1px solid var(--border);
-    color: var(--muted);
-    border-radius: 6px;
-    padding: 0.35rem 0.8rem;
-    font-family: 'DM Sans', sans-serif;
-    font-size: 0.75rem;
-    cursor: pointer;
-    transition: all 0.15s;
-  }
-
+  .sign-out-btn { background: transparent; border: 1px solid var(--border); color: var(--muted); border-radius: 6px; padding: 0.35rem 0.8rem; font-family: 'DM Sans', sans-serif; font-size: 0.75rem; cursor: pointer; transition: all 0.15s; }
   .sign-out-btn:hover { border-color: var(--red); color: var(--red); }
-
-  .champion-badge {
-    display: inline-flex;
-    align-items: center;
-    gap: 0.4rem;
-    background: rgba(255,213,79,0.08);
-    border: 1px solid rgba(255,213,79,0.2);
-    border-radius: 4px;
-    padding: 0.2rem 0.6rem;
-    font-size: 0.72rem;
-    color: var(--gold);
-    font-weight: 500;
-  }
-
-  .tabs {
-    max-width: 1100px;
-    margin: 0 auto;
-    display: flex;
-  }
-
-  .tab-btn {
-    background: transparent;
-    border: none;
-    border-bottom: 2px solid transparent;
-    color: var(--muted);
-    font-family: 'DM Sans', sans-serif;
-    font-size: 0.85rem;
-    font-weight: 500;
-    padding: 0.75rem 1.5rem;
-    cursor: pointer;
-    transition: all 0.15s;
-  }
-
+  .champion-badge { display: inline-flex; align-items: center; gap: 0.4rem; background: rgba(255,213,79,0.08); border: 1px solid rgba(255,213,79,0.2); border-radius: 4px; padding: 0.2rem 0.6rem; font-size: 0.72rem; color: var(--gold); font-weight: 500; }
+  .tabs { max-width: 1100px; margin: 0 auto; display: flex; }
+  .tab-btn { background: transparent; border: none; border-bottom: 2px solid transparent; color: var(--muted); font-family: 'DM Sans', sans-serif; font-size: 0.85rem; font-weight: 500; padding: 0.75rem 1.5rem; cursor: pointer; transition: all 0.15s; }
   .tab-btn:hover { color: var(--text); }
   .tab-btn.active { color: var(--green); border-bottom-color: var(--green); }
-
   .tab-content { display: none; }
   .tab-content.active { display: block; }
-
   .main { max-width: 1100px; margin: 0 auto; padding: 2rem; }
 
-  .section-label {
-    font-size: 0.62rem;
-    font-weight: 700;
-    letter-spacing: 0.2em;
-    text-transform: uppercase;
-    color: var(--green);
-    margin-bottom: 1rem;
-    display: flex;
-    align-items: center;
-    gap: 0.6rem;
-  }
-
+  .section-label { font-size: 0.62rem; font-weight: 700; letter-spacing: 0.2em; text-transform: uppercase; color: var(--green); margin-bottom: 1rem; display: flex; align-items: center; gap: 0.6rem; }
   .section-label::after { content: ''; flex: 1; height: 1px; background: var(--border); }
 
-  .leaderboard-card {
-    background: var(--card);
-    border: 1px solid var(--border);
-    border-radius: 10px;
-    overflow: hidden;
-    max-width: 600px;
-  }
-
-  .lb-row {
-    display: grid;
-    grid-template-columns: 28px 1fr auto auto;
-    align-items: center;
-    gap: 0.75rem;
-    padding: 0.85rem 1.1rem;
-    border-bottom: 1px solid var(--border);
-    transition: background 0.15s;
-  }
-
+  /* Leaderboard */
+  .leaderboard-card { background: var(--card); border: 1px solid var(--border); border-radius: 10px; overflow: hidden; max-width: 600px; }
+  .lb-row { display: grid; grid-template-columns: 28px 1fr auto auto; align-items: center; gap: 0.75rem; padding: 0.85rem 1.1rem; border-bottom: 1px solid var(--border); transition: background 0.15s; }
   .lb-row:last-child { border-bottom: none; }
   .lb-row:hover { background: rgba(0,230,118,0.03); }
   .lb-row.top-1 { background: rgba(255,213,79,0.05); }
   .lb-row.top-2 { background: rgba(176,190,197,0.03); }
   .lb-row.top-3 { background: rgba(161,115,78,0.04); }
-
   .lb-rank { font-family: 'Bebas Neue', sans-serif; font-size: 1.1rem; text-align: center; }
   .top-1 .lb-rank { color: var(--gold); }
   .top-2 .lb-rank { color: var(--silver); }
   .top-3 .lb-rank { color: var(--bronze); }
   .lb-row:not(.top-1):not(.top-2):not(.top-3) .lb-rank { color: var(--muted); }
-
   .lb-name { font-weight: 500; font-size: 0.9rem; }
-  .lb-weekly { font-size: 0.72rem; color: var(--muted); text-align: right; }
-  .lb-points { font-family: 'Bebas Neue', sans-serif; font-size: 1.4rem; color: var(--green); text-align: right; line-height: 1; }
+  .lb-pts-col { text-align: right; }
+  .lb-points { font-family: 'Bebas Neue', sans-serif; font-size: 1.4rem; color: var(--green); line-height: 1; }
+  .lb-gw { font-size: 0.7rem; color: var(--muted); }
+  .tied-badge { font-size: 0.58rem; background: rgba(0,230,118,0.1); color: var(--green); border-radius: 3px; padding: 1px 4px; font-weight: 700; letter-spacing: 0.05em; margin-left: 4px; }
+  .you-badge { font-size: 0.58rem; background: rgba(255,213,79,0.15); color: var(--gold); border-radius: 3px; padding: 1px 4px; font-weight: 700; letter-spacing: 0.05em; margin-left: 4px; }
 
-  .tied-badge {
-    font-size: 0.58rem; background: rgba(0,230,118,0.1); color: var(--green);
-    border-radius: 3px; padding: 1px 4px; font-weight: 700; letter-spacing: 0.05em; margin-left: 4px;
-  }
-
-  .you-badge {
-    font-size: 0.58rem; background: rgba(255,213,79,0.15); color: var(--gold);
-    border-radius: 3px; padding: 1px 4px; font-weight: 700; letter-spacing: 0.05em; margin-left: 4px;
-  }
-
-  .gw-header {
-    display: flex; align-items: baseline; justify-content: space-between;
-    margin-bottom: 1rem; flex-wrap: wrap; gap: 0.5rem;
-  }
-
+  /* Fixtures */
+  .gw-header { display: flex; align-items: baseline; justify-content: space-between; margin-bottom: 1rem; flex-wrap: wrap; gap: 0.5rem; }
   .gw-title { font-family: 'Bebas Neue', sans-serif; font-size: 2rem; line-height: 1; }
   .gw-date { font-size: 0.75rem; color: var(--muted); }
-
-  .deadline-pill {
-    font-size: 0.65rem; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase;
-    background: rgba(239,83,80,0.1); border: 1px solid rgba(239,83,80,0.3);
-    color: var(--red); border-radius: 20px; padding: 0.25rem 0.7rem;
-  }
-
+  .deadline-pill { font-size: 0.65rem; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; background: rgba(239,83,80,0.1); border: 1px solid rgba(239,83,80,0.3); color: var(--red); border-radius: 20px; padding: 0.25rem 0.7rem; }
   .deadline-pill.ok { background: rgba(0,230,118,0.08); border-color: rgba(0,230,118,0.2); color: var(--green); }
-
+  .deadline-pill.live { background: rgba(255,167,38,0.1); border-color: rgba(255,167,38,0.3); color: var(--amber); }
   .fixture-list { display: flex; flex-direction: column; gap: 0.6rem; }
 
-  .fixture-card {
-    background: var(--card); border: 1px solid var(--border); border-radius: 8px;
-    padding: 0.85rem 1rem; display: grid; grid-template-columns: 1fr auto 1fr;
-    align-items: center; gap: 0.75rem;
-  }
+  .fixture-card { background: var(--card); border: 1px solid var(--border); border-radius: 8px; padding: 0.85rem 1rem; display: grid; grid-template-columns: 1fr auto 1fr; align-items: center; gap: 0.75rem; transition: border-color 0.2s; }
+  .fixture-card.correct-score { border-color: var(--green); background: rgba(0,230,118,0.05); }
+  .fixture-card.correct-result { border-color: var(--amber); background: rgba(255,167,38,0.04); }
+  .fixture-card.wrong { border-color: rgba(239,83,80,0.3); }
+  .fixture-card.live-now { border-color: var(--amber); }
 
   .fixture-team { font-weight: 500; font-size: 0.88rem; line-height: 1.2; }
   .fixture-team.home { text-align: right; }
@@ -332,81 +110,57 @@
   .fixture-time { font-size: 0.65rem; color: var(--muted); text-align: center; margin-top: 2px; }
 
   .score-inputs { display: flex; align-items: center; gap: 0.4rem; justify-content: center; }
-
-  .score-input {
-    width: 38px; height: 38px; background: var(--bg3); border: 1px solid var(--border);
-    border-radius: 6px; color: var(--text); font-family: 'Bebas Neue', sans-serif;
-    font-size: 1.3rem; text-align: center; transition: border-color 0.15s, box-shadow 0.15s;
-    -moz-appearance: textfield;
-  }
-
-  .score-input::-webkit-outer-spin-button,
-  .score-input::-webkit-inner-spin-button { -webkit-appearance: none; }
-
+  .score-input { width: 38px; height: 38px; background: var(--bg3); border: 1px solid var(--border); border-radius: 6px; color: var(--text); font-family: 'Bebas Neue', sans-serif; font-size: 1.3rem; text-align: center; transition: border-color 0.15s; -moz-appearance: textfield; }
+  .score-input::-webkit-outer-spin-button, .score-input::-webkit-inner-spin-button { -webkit-appearance: none; }
   .score-input:focus { outline: none; border-color: var(--green); box-shadow: 0 0 0 2px rgba(0,230,118,0.15); }
   .score-input:disabled { opacity: 0.4; cursor: not-allowed; }
-
   .score-sep { color: var(--muted); font-family: 'Bebas Neue', sans-serif; font-size: 1.2rem; }
 
+  /* Live score display */
+  .live-score { display: flex; align-items: center; gap: 0.4rem; justify-content: center; }
+  .live-score-num { font-family: 'Bebas Neue', sans-serif; font-size: 1.6rem; line-height: 1; color: var(--text); min-width: 28px; text-align: center; }
+  .live-score-sep { color: var(--muted); font-family: 'Bebas Neue', sans-serif; font-size: 1.2rem; }
+  .live-badge { font-size: 0.55rem; font-weight: 700; letter-spacing: 0.08em; background: rgba(255,167,38,0.15); color: var(--amber); border-radius: 3px; padding: 1px 4px; margin-top: 2px; text-align: center; }
+  .result-badge { font-size: 0.6rem; font-weight: 700; text-align: center; margin-top: 3px; }
+  .result-badge.pts-3 { color: var(--green); }
+  .result-badge.pts-1 { color: var(--amber); }
+  .result-badge.pts-0 { color: var(--muted); }
+
+  .pts-summary { background: var(--bg3); border: 1px solid var(--border); border-radius: 8px; padding: 1rem 1.25rem; margin-bottom: 1.5rem; display: flex; gap: 2rem; flex-wrap: wrap; }
+  .pts-stat { text-align: center; }
+  .pts-stat-num { font-family: 'Bebas Neue', sans-serif; font-size: 2rem; color: var(--green); line-height: 1; }
+  .pts-stat-label { font-size: 0.65rem; color: var(--muted); letter-spacing: 0.08em; text-transform: uppercase; margin-top: 2px; }
+
   .save-bar { margin-top: 1.5rem; display: flex; align-items: center; gap: 1rem; flex-wrap: wrap; }
-
-  .btn-save {
-    background: var(--green); color: #031a03; border: none; border-radius: 7px;
-    padding: 0.75rem 2rem; font-family: 'DM Sans', sans-serif; font-weight: 700;
-    font-size: 0.9rem; cursor: pointer; transition: all 0.15s;
-  }
-
+  .btn-save { background: var(--green); color: #031a03; border: none; border-radius: 7px; padding: 0.75rem 2rem; font-family: 'DM Sans', sans-serif; font-weight: 700; font-size: 0.9rem; cursor: pointer; transition: all 0.15s; }
   .btn-save:hover { background: #00ff88; transform: translateY(-1px); }
   .btn-save:disabled { opacity: 0.5; cursor: not-allowed; transform: none; }
-
   .save-msg { font-size: 0.8rem; color: var(--green); opacity: 0; transition: opacity 0.3s; }
   .save-msg.show { opacity: 1; }
 
+  /* Predictions table */
   .predictions-summary { margin-top: 2rem; overflow-x: auto; }
-
   .pred-table { width: 100%; border-collapse: collapse; font-size: 0.78rem; min-width: 600px; }
-
-  .pred-table th {
-    padding: 0.5rem 0.75rem; text-align: left; color: var(--muted); font-weight: 500;
-    font-size: 0.65rem; letter-spacing: 0.08em; text-transform: uppercase;
-    border-bottom: 1px solid var(--border);
-  }
-
-  .pred-table td {
-    padding: 0.55rem 0.75rem; border-bottom: 1px solid rgba(31,46,31,0.5); vertical-align: middle;
-  }
-
+  .pred-table th { padding: 0.5rem 0.75rem; text-align: left; color: var(--muted); font-weight: 500; font-size: 0.65rem; letter-spacing: 0.08em; text-transform: uppercase; border-bottom: 1px solid var(--border); }
+  .pred-table td { padding: 0.55rem 0.75rem; border-bottom: 1px solid rgba(31,46,31,0.5); vertical-align: middle; }
   .pred-table tr:last-child td { border-bottom: none; }
   .pred-table tr:hover td { background: rgba(0,230,118,0.02); }
   .pred-table tr.my-row td { background: rgba(255,213,79,0.03); }
-
-  .pred-chip {
-    display: inline-block; background: var(--bg3); border-radius: 4px;
-    padding: 2px 7px; font-weight: 600; font-size: 0.75rem;
-  }
-
+  .pred-chip { display: inline-block; background: var(--bg3); border-radius: 4px; padding: 2px 7px; font-weight: 600; font-size: 0.75rem; }
   .pred-chip.empty { color: var(--muted); font-weight: 400; font-style: italic; }
+  .pred-chip.chip-correct-score { background: rgba(0,230,118,0.15); color: var(--green); }
+  .pred-chip.chip-correct-result { background: rgba(255,167,38,0.12); color: var(--amber); }
+  .pred-chip.chip-wrong { color: var(--muted); }
 
-  .rules-callout {
-    background: var(--bg3); border: 1px solid var(--border); border-left: 3px solid var(--green);
-    border-radius: 6px; padding: 1rem 1.2rem; margin-top: 2rem;
-    font-size: 0.78rem; color: var(--muted); line-height: 1.8;
-  }
+  .hidden-notice { background: var(--bg3); border: 1px solid var(--border); border-left: 3px solid var(--amber); border-radius: 6px; padding: 0.85rem 1.2rem; font-size: 0.8rem; color: var(--muted); margin-top: 1.5rem; }
+  .hidden-notice strong { color: var(--text); }
 
+  .rules-callout { background: var(--bg3); border: 1px solid var(--border); border-left: 3px solid var(--green); border-radius: 6px; padding: 1rem 1.2rem; margin-top: 2rem; font-size: 0.78rem; color: var(--muted); line-height: 1.8; }
   .rules-callout strong { color: var(--text); }
 
-  .state-box {
-    background: var(--card); border: 1px solid var(--border); border-radius: 8px;
-    padding: 2.5rem; text-align: center; color: var(--muted);
-  }
-
-  .spinner {
-    width: 28px; height: 28px; border: 2px solid var(--border); border-top-color: var(--green);
-    border-radius: 50%; animation: spin 0.8s linear infinite; margin: 0 auto 1rem;
-  }
-
+  .state-box { background: var(--card); border: 1px solid var(--border); border-radius: 8px; padding: 2.5rem; text-align: center; color: var(--muted); }
+  .spinner { width: 28px; height: 28px; border: 2px solid var(--border); border-top-color: var(--green); border-radius: 50%; animation: spin 0.8s linear infinite; margin: 0 auto 1rem; }
   @keyframes spin { to { transform: rotate(360deg); } }
-
   .no-gw-msg { font-family: 'Bebas Neue', sans-serif; font-size: 1.8rem; color: var(--muted); margin-bottom: 0.5rem; }
 
   .fade-in { animation: fadeIn 0.4s ease both; }
@@ -416,21 +170,19 @@
     header, .main { padding: 1.2rem; }
     .score-input { width: 32px; height: 32px; font-size: 1.1rem; }
     .champion-badge { display: none; }
+    .pts-summary { gap: 1rem; }
   }
 </style>
 </head>
 <body>
 
-<!-- ─── Auth Screen ─── -->
+<!-- Auth -->
 <div id="auth-screen">
   <div class="auth-card">
     <div class="auth-logo">GUESS <span>TO WIN</span></div>
     <div class="auth-subtitle">2025/26 Season · Sign in to submit your predictions</div>
-
     <div id="auth-error" class="auth-error"></div>
     <div id="auth-success" class="auth-success"></div>
-
-    <!-- Sign In -->
     <div id="signin-form">
       <label class="auth-label">Email</label>
       <input class="auth-input" type="email" id="signin-email" placeholder="your@email.com" onkeydown="if(event.key==='Enter')signIn()">
@@ -439,22 +191,13 @@
       <button class="auth-btn" id="signin-btn" onclick="signIn()">Sign In</button>
       <div class="auth-toggle">No account yet? <a onclick="showSignup()">Sign up here</a></div>
     </div>
-
-    <!-- Sign Up -->
     <div id="signup-form" style="display:none">
       <label class="auth-label">Who are you?</label>
       <select class="auth-select" id="signup-player">
         <option value="">— Select your name —</option>
-        <option>Jake</option>
-        <option>Glurk</option>
-        <option>Josh ☆</option>
-        <option>Richard ☆</option>
-        <option>Teflon</option>
-        <option>Alex</option>
-        <option>Gaz ☆</option>
-        <option>Liam</option>
-        <option>Craig</option>
-        <option>Marcus</option>
+        <option>Jake</option><option>Glurk</option><option>Josh ☆</option>
+        <option>Richard ☆</option><option>Teflon</option><option>Alex</option>
+        <option>Gaz ☆</option><option>Liam</option><option>Craig</option><option>Marcus</option>
       </select>
       <label class="auth-label">Email</label>
       <input class="auth-input" type="email" id="signup-email" placeholder="your@email.com">
@@ -466,7 +209,7 @@
   </div>
 </div>
 
-<!-- ─── Main App ─── -->
+<!-- App -->
 <div id="app-screen">
   <header>
     <div class="header-top">
@@ -476,10 +219,7 @@
       </div>
       <div class="user-area">
         <div class="champion-badge">⭐ Reigning champion: Richard Tuck</div>
-        <div class="user-pill">
-          <div class="user-dot"></div>
-          <span id="user-name-display">...</span>
-        </div>
+        <div class="user-pill"><div class="user-dot"></div><span id="user-name-display">...</span></div>
         <button class="sign-out-btn" onclick="signOut()">Sign out</button>
       </div>
     </div>
@@ -492,20 +232,15 @@
   <!-- Scores Tab -->
   <div id="tab-scores" class="tab-content active">
     <div class="main">
-      <div id="fixtures-section">
-        <div class="state-box"><div class="spinner"></div><div>Fetching fixtures…</div></div>
-      </div>
+      <div id="fixtures-section"><div class="state-box"><div class="spinner"></div><div>Fetching fixtures…</div></div></div>
       <div id="summary-section" style="display:none">
         <div class="section-label" style="margin-top:2rem">All predictions this gameweek</div>
         <div class="predictions-summary">
-          <table class="pred-table">
-            <thead id="pred-thead"></thead>
-            <tbody id="pred-tbody"></tbody>
-          </table>
+          <table class="pred-table"><thead id="pred-thead"></thead><tbody id="pred-tbody"></tbody></table>
         </div>
       </div>
       <div class="rules-callout">
-        <strong>Rules reminder:</strong> Submit before the first game kicks off. No changes after kick-off (unless you haven't submitted at all).
+        <strong>Rules:</strong> Submit before the first game kicks off. No changes after kick-off.
         Correct result = <strong>1pt</strong> · Correct score = <strong>3pts</strong> · Cost: <strong>£2/week</strong>
       </div>
     </div>
@@ -514,8 +249,7 @@
   <!-- Leaderboard Tab -->
   <div id="tab-leaderboard" class="tab-content">
     <div class="main">
-      <div class="section-label">Season standings — after GW26</div>
-      <div class="leaderboard-card" id="leaderboard-card"></div>
+      <div id="leaderboard-section"><div class="state-box"><div class="spinner"></div><div>Loading standings…</div></div></div>
       <div style="margin-top:1rem;font-size:0.68rem;color:var(--muted);line-height:1.6">
         Season pot accumulates at £1/player/week · Weekly winner splits £10 if tied
       </div>
@@ -530,300 +264,435 @@ const sb = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 
 const PLAYERS = ['Jake','Glurk','Josh ☆','Richard ☆','Teflon','Alex','Gaz ☆','Liam','Craig','Marcus'];
 
-const LEADERBOARD = [
-  { name: 'Marcus',     points: 159, weekly: '£38.33', tied: true },
-  { name: 'Richard ☆', points: 159, weekly: '£38.33', tied: true },
-  { name: 'Glurk',     points: 154, weekly: '£33.33' },
-  { name: 'Jake',      points: 153, weekly: '£16.67' },
-  { name: 'Alex',      points: 149, weekly: '£16.67' },
-  { name: 'Teflon',    points: 147, weekly: '£48.33' },
-  { name: 'Josh ☆',   points: 143, weekly: '£20.00' },
-  { name: 'Gaz ☆',    points: 142, weekly: '£30.00' },
-  { name: 'Liam',      points: 138, weekly: '£3.33'  },
-  { name: 'Craig',     points: 136, weekly: '£15.00' },
-];
+// GW26 hardcoded base scores — new GWs are added on top from Supabase
+const BASE_SCORES = {
+  'Jake': 153, 'Glurk': 154, 'Josh ☆': 143, 'Richard ☆': 159,
+  'Teflon': 147, 'Alex': 149, 'Gaz ☆': 142, 'Liam': 138, 'Craig': 136, 'Marcus': 159
+};
+const BASE_WEEKLY_PRIZE = {
+  'Jake': 16.67, 'Glurk': 33.33, 'Josh ☆': 20, 'Richard ☆': 38.33,
+  'Teflon': 48.33, 'Alex': 16.67, 'Gaz ☆': 30, 'Liam': 3.33, 'Craig': 15, 'Marcus': 38.33
+};
 
 let currentUser = null;
 let currentPlayerName = '';
 let currentGW = null;
 let currentMatches = [];
-let allPredictions = {}; // { playerName: { matchKey: {home,away} } }
+let allPredictions = {};
+let liveResults = {};
+let deadlinePassed = false;
+let refreshTimer = null;
 
-// ── Auth helpers ──────────────────────────────────────────────────────────────
-function showError(msg) {
-  const el = document.getElementById('auth-error');
-  el.textContent = msg; el.style.display = 'block';
-  document.getElementById('auth-success').style.display = 'none';
-}
-
-function showSuccessMsg(msg) {
-  const el = document.getElementById('auth-success');
-  el.textContent = msg; el.style.display = 'block';
-  document.getElementById('auth-error').style.display = 'none';
-}
-
-function showSignup() {
-  document.getElementById('signin-form').style.display = 'none';
-  document.getElementById('signup-form').style.display = 'block';
-  document.getElementById('auth-error').style.display = 'none';
-  document.getElementById('auth-success').style.display = 'none';
-}
-
-function showSignin() {
-  document.getElementById('signup-form').style.display = 'none';
-  document.getElementById('signin-form').style.display = 'block';
-  document.getElementById('auth-error').style.display = 'none';
-  document.getElementById('auth-success').style.display = 'none';
-}
+// ── Auth ──────────────────────────────────────────────────────────────────────
+function showError(msg) { const e=document.getElementById('auth-error'); e.textContent=msg; e.style.display='block'; document.getElementById('auth-success').style.display='none'; }
+function showSuccessMsg(msg) { const e=document.getElementById('auth-success'); e.textContent=msg; e.style.display='block'; document.getElementById('auth-error').style.display='none'; }
+function showSignup() { document.getElementById('signin-form').style.display='none'; document.getElementById('signup-form').style.display='block'; document.getElementById('auth-error').style.display='none'; document.getElementById('auth-success').style.display='none'; }
+function showSignin() { document.getElementById('signup-form').style.display='none'; document.getElementById('signin-form').style.display='block'; document.getElementById('auth-error').style.display='none'; document.getElementById('auth-success').style.display='none'; }
 
 async function signIn() {
-  const email = document.getElementById('signin-email').value.trim();
-  const password = document.getElementById('signin-password').value;
-  if (!email || !password) { showError('Please enter your email and password.'); return; }
-  const btn = document.getElementById('signin-btn');
-  btn.disabled = true; btn.textContent = 'Signing in…';
-  const { data, error } = await sb.auth.signInWithPassword({ email, password });
-  btn.disabled = false; btn.textContent = 'Sign In';
-  if (error) { showError(error.message); return; }
+  const email=document.getElementById('signin-email').value.trim();
+  const password=document.getElementById('signin-password').value;
+  if(!email||!password){showError('Please enter your email and password.');return;}
+  const btn=document.getElementById('signin-btn');
+  btn.disabled=true;btn.textContent='Signing in…';
+  const {data,error}=await sb.auth.signInWithPassword({email,password});
+  btn.disabled=false;btn.textContent='Sign In';
+  if(error){showError(error.message);return;}
   await loadApp(data.user);
 }
 
 async function signUp() {
-  const player = document.getElementById('signup-player').value;
-  const email = document.getElementById('signup-email').value.trim();
-  const password = document.getElementById('signup-password').value;
-  if (!player) { showError('Please select your name from the list.'); return; }
-  if (!email || !password) { showError('Please fill in all fields.'); return; }
-  if (password.length < 6) { showError('Password must be at least 6 characters.'); return; }
-
-  const btn = document.getElementById('signup-btn');
-  btn.disabled = true; btn.textContent = 'Creating account…';
-
-  const { data, error } = await sb.auth.signUp({
-    email, password,
-    options: { data: { player_name: player } }
-  });
-
-  btn.disabled = false; btn.textContent = 'Create Account';
-  if (error) { showError(error.message); return; }
-
-  // Insert into profiles table
-  if (data.user) {
-    await sb.from('profiles').upsert({
-      id: data.user.id,
-      player_name: player
-    });
-  }
-
+  const player=document.getElementById('signup-player').value;
+  const email=document.getElementById('signup-email').value.trim();
+  const password=document.getElementById('signup-password').value;
+  if(!player){showError('Please select your name.');return;}
+  if(!email||!password){showError('Please fill in all fields.');return;}
+  if(password.length<6){showError('Password must be at least 6 characters.');return;}
+  const btn=document.getElementById('signup-btn');
+  btn.disabled=true;btn.textContent='Creating account…';
+  const {data,error}=await sb.auth.signUp({email,password,options:{data:{player_name:player}}});
+  btn.disabled=false;btn.textContent='Create Account';
+  if(error){showError(error.message);return;}
+  if(data.user){await sb.from('profiles').upsert({id:data.user.id,player_name:player});}
   showSuccessMsg('Account created! Check your email to confirm, then sign in.');
   showSignin();
 }
 
 async function signOut() {
+  if(refreshTimer) clearInterval(refreshTimer);
   await sb.auth.signOut();
-  document.getElementById('app-screen').style.display = 'none';
-  document.getElementById('auth-screen').style.display = 'flex';
-  currentUser = null; currentPlayerName = '';
+  document.getElementById('app-screen').style.display='none';
+  document.getElementById('auth-screen').style.display='flex';
+  currentUser=null;currentPlayerName='';
 }
 
 async function loadApp(user) {
-  currentUser = user;
-
-  // Get player name from profiles table
-  const { data: profile } = await sb.from('profiles').select('player_name').eq('id', user.id).single();
-  currentPlayerName = profile?.player_name || user.user_metadata?.player_name || user.email.split('@')[0];
-
-  document.getElementById('auth-screen').style.display = 'none';
-  document.getElementById('app-screen').style.display = 'block';
-  document.getElementById('user-name-display').textContent = currentPlayerName;
-
-  renderLeaderboard();
+  currentUser=user;
+  const {data:profile}=await sb.from('profiles').select('player_name').eq('id',user.id).single();
+  currentPlayerName=profile?.player_name||user.user_metadata?.player_name||user.email.split('@')[0];
+  document.getElementById('auth-screen').style.display='none';
+  document.getElementById('app-screen').style.display='block';
+  document.getElementById('user-name-display').textContent=currentPlayerName;
   fetchAndRenderFixtures();
+  renderLeaderboard();
 }
 
 // ── Tabs ──────────────────────────────────────────────────────────────────────
-function switchTab(tab, btn) {
-  document.querySelectorAll('.tab-content').forEach(t => t.classList.remove('active'));
-  document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
-  document.getElementById('tab-' + tab).classList.add('active');
+function switchTab(tab,btn) {
+  document.querySelectorAll('.tab-content').forEach(t=>t.classList.remove('active'));
+  document.querySelectorAll('.tab-btn').forEach(b=>b.classList.remove('active'));
+  document.getElementById('tab-'+tab).classList.add('active');
   btn.classList.add('active');
+  if(tab==='leaderboard') renderLeaderboard();
+}
+
+// ── Scoring logic ─────────────────────────────────────────────────────────────
+function calcPoints(predH, predA, actH, actA) {
+  if(predH===undefined||predA===undefined||actH===null||actA===null) return null;
+  if(predH===actH && predA===actA) return 3;
+  const predResult = predH>predA?'H':predH<predA?'A':'D';
+  const actResult  = actH>actA?'H':actH<actA?'A':'D';
+  if(predResult===actResult) return 1;
+  return 0;
 }
 
 // ── Leaderboard ───────────────────────────────────────────────────────────────
-function renderLeaderboard() {
-  const card = document.getElementById('leaderboard-card');
-  const rankClasses = ['top-1','top-1','top-2','top-3'];
-  card.innerHTML = LEADERBOARD.map((p, i) => {
-    const cls = rankClasses[i] || '';
-    const rank = i <= 1 ? 1 : i + 1;
-    const isMe = p.name === currentPlayerName;
-    return `<div class="lb-row ${cls}">
-      <div class="lb-rank">${rank}</div>
-      <div class="lb-name">${p.name}
-        ${p.tied ? '<span class="tied-badge">TIE</span>' : ''}
-        ${isMe ? '<span class="you-badge">YOU</span>' : ''}
-      </div>
-      <div class="lb-weekly"><div style="font-size:0.65rem">weekly £</div>${p.weekly}</div>
-      <div class="lb-points">${p.points}</div>
+async function renderLeaderboard() {
+  const section = document.getElementById('leaderboard-section');
+
+  // Load all completed results from Supabase
+  const {data: results} = await sb.from('results').select('*').eq('status','finished');
+  const {data: allPreds} = await sb.from('predictions')
+    .select('user_id, gameweek, match_key, home_score, away_score, profiles(player_name)');
+
+  // Build points per player per GW from Supabase
+  const gwPoints = {}; // { playerName: { gw: pts } }
+  const gwWinners = {}; // { gw: [names] }
+
+  if(results && allPreds) {
+    const resultMap = {};
+    results.forEach(r => { resultMap[`${r.gameweek}_${r.match_key}`] = r; });
+
+    allPreds.forEach(p => {
+      const name = p.profiles?.player_name;
+      if(!name) return;
+      const r = resultMap[`${p.gameweek}_${p.match_key}`];
+      if(!r) return;
+      const pts = calcPoints(p.home_score, p.away_score, r.home_score, r.away_score);
+      if(pts===null) return;
+      if(!gwPoints[name]) gwPoints[name]={};
+      gwPoints[name][p.gameweek] = (gwPoints[name][p.gameweek]||0) + pts;
+    });
+
+    // Find weekly winners
+    const gws = [...new Set(results.map(r=>r.gameweek))];
+    gws.forEach(gw => {
+      const scores = PLAYERS.map(n=>({name:n,pts:gwPoints[n]?.[gw]||0}));
+      const max = Math.max(...scores.map(s=>s.pts));
+      if(max>0) gwWinners[gw] = scores.filter(s=>s.pts===max).map(s=>s.name);
+    });
+  }
+
+  // Calculate total points = base + supabase GWs
+  const totals = PLAYERS.map(name => {
+    const supabasePts = Object.values(gwPoints[name]||{}).reduce((a,b)=>a+b,0);
+    const total = BASE_SCORES[name] + supabasePts;
+
+    // Weekly prize money from new GWs
+    let extraPrize = 0;
+    Object.entries(gwWinners).forEach(([gw,winners]) => {
+      if(winners.includes(name)) extraPrize += 10/winners.length;
+    });
+
+    return { name, total, weekly: BASE_WEEKLY_PRIZE[name] + extraPrize };
+  }).sort((a,b)=>b.total-a.total);
+
+  // Assign ranks (tied players share rank)
+  let rank=1;
+  for(let i=0;i<totals.length;i++){
+    if(i>0 && totals[i].total===totals[i-1].total) totals[i].rank=totals[i-1].rank;
+    else totals[i].rank=rank;
+    rank++;
+  }
+
+  const rankClass = r => r===1?'top-1':r===2?'top-2':r===3?'top-3':'';
+
+  section.innerHTML = `
+    <div class="section-label">Season standings</div>
+    <div class="leaderboard-card">
+      ${totals.map((p,i) => {
+        const tied = totals.filter(t=>t.total===p.total).length>1;
+        const isMe = p.name===currentPlayerName;
+        return `<div class="lb-row ${rankClass(p.rank)}">
+          <div class="lb-rank">${p.rank}</div>
+          <div class="lb-name">${p.name}
+            ${tied?'<span class="tied-badge">TIE</span>':''}
+            ${isMe?'<span class="you-badge">YOU</span>':''}
+          </div>
+          <div class="lb-pts-col">
+            <div class="lb-points">${p.total}</div>
+            <div class="lb-gw">£${p.weekly.toFixed(2)} won</div>
+          </div>
+        </div>`;
+      }).join('')}
     </div>`;
-  }).join('');
 }
 
-// ── Fixtures ──────────────────────────────────────────────────────────────────
+// ── API ───────────────────────────────────────────────────────────────────────
 async function fetchFixtures() {
-  const apiUrl = 'https://api.football-data.org/v4/competitions/PL/matches?status=SCHEDULED';
-  const proxyUrl = 'https://corsproxy.io/?' + encodeURIComponent(apiUrl);
+  const apiUrl='https://api.football-data.org/v4/competitions/PL/matches?status=SCHEDULED';
+  const proxyUrl='https://corsproxy.io/?'+encodeURIComponent(apiUrl);
   try {
-    const res = await fetch(proxyUrl, { headers: { 'X-Auth-Token': '06f21e4fcbf44c9984aa595874172fa2' } });
-    if (!res.ok) throw new Error('API error');
-    const data = await res.json();
-    return data.matches || [];
-  } catch(e) { return null; }
+    const res=await fetch(proxyUrl,{headers:{'X-Auth-Token':'06f21e4fcbf44c9984aa595874172fa2'}});
+    if(!res.ok) throw new Error();
+    const data=await res.json();
+    return data.matches||[];
+  } catch(e){return null;}
+}
+
+async function fetchLiveMatches(gw) {
+  // Fetch in-play and finished matches for current weekend
+  const {from,to}=getNextWeekendWindow();
+  const dateFrom=from.toISOString().slice(0,10);
+  const dateTo=to.toISOString().slice(0,10);
+  const apiUrl=`https://api.football-data.org/v4/competitions/PL/matches?dateFrom=${dateFrom}&dateTo=${dateTo}`;
+  const proxyUrl='https://corsproxy.io/?'+encodeURIComponent(apiUrl);
+  try {
+    const res=await fetch(proxyUrl,{headers:{'X-Auth-Token':'06f21e4fcbf44c9984aa595874172fa2'}});
+    if(!res.ok) throw new Error();
+    const data=await res.json();
+    return data.matches||[];
+  } catch(e){return [];}
 }
 
 function getNextWeekendWindow() {
-  const now = new Date();
-  const day = now.getDay();
-  const daysToSat = (6 - day + 7) % 7 || 7;
-  const sat = new Date(now);
-  sat.setDate(now.getDate() + daysToSat);
+  const now=new Date();
+  const day=now.getDay();
+  const daysToSat=(6-day+7)%7||7;
+  const sat=new Date(now);
+  sat.setDate(now.getDate()+daysToSat);
   sat.setHours(0,0,0,0);
-  const mon = new Date(sat);
-  mon.setDate(sat.getDate() + 2);
+  const mon=new Date(sat);
+  mon.setDate(sat.getDate()+2);
   mon.setHours(23,59,59,999);
-  return { from: sat, to: mon };
+  return {from:sat,to:mon};
 }
 
 function filterWeekendMatches(matches) {
-  const { from, to } = getNextWeekendWindow();
-  return matches.filter(m => { const d = new Date(m.utcDate); return d >= from && d <= to; });
+  const {from,to}=getNextWeekendWindow();
+  return matches.filter(m=>{const d=new Date(m.utcDate);return d>=from&&d<=to;});
 }
 
 function formatMatchTime(utcDate) {
-  const d = new Date(utcDate);
-  return d.toLocaleDateString('en-GB',{weekday:'short',day:'numeric',month:'short'}) +
-    ' · ' + d.toLocaleTimeString('en-GB',{hour:'2-digit',minute:'2-digit'});
+  const d=new Date(utcDate);
+  return d.toLocaleDateString('en-GB',{weekday:'short',day:'numeric',month:'short'})+
+    ' · '+d.toLocaleTimeString('en-GB',{hour:'2-digit',minute:'2-digit'});
 }
 
 function estimateGWNumber(matches) {
-  if (!matches.length) return 27;
-  const d = new Date(matches[0].utcDate);
-  const seasonStart = new Date('2025-08-16');
-  return Math.max(27, Math.ceil((d - seasonStart) / (7*24*60*60*1000)));
+  if(!matches.length) return 27;
+  const d=new Date(matches[0].utcDate);
+  const seasonStart=new Date('2025-08-16');
+  return Math.max(27,Math.ceil((d-seasonStart)/(7*24*60*60*1000)));
 }
 
 // ── Supabase predictions ───────────────────────────────────────────────────────
 async function loadAllPredictions(gw) {
-  // Join predictions with profiles to get player names
-  const { data, error } = await sb
-    .from('predictions')
-    .select('match_key, home_score, away_score, profiles(player_name)')
-    .eq('gameweek', gw);
-
-  if (error) { console.error(error); return {}; }
-
-  const result = {};
-  data.forEach(row => {
-    const name = row.profiles?.player_name || 'Unknown';
-    if (!result[name]) result[name] = {};
-    result[name][row.match_key] = { home: row.home_score, away: row.away_score };
+  const {data,error}=await sb.from('predictions')
+    .select('match_key,home_score,away_score,profiles(player_name)')
+    .eq('gameweek',gw);
+  if(error){console.error(error);return{};}
+  const result={};
+  data.forEach(row=>{
+    const name=row.profiles?.player_name||'Unknown';
+    if(!result[name])result[name]={};
+    result[name][row.match_key]={home:row.home_score,away:row.away_score};
   });
   return result;
 }
 
-async function saveMyPredictions(gw, preds) {
-  const rows = Object.entries(preds).map(([match_key, scores]) => ({
-    user_id: currentUser.id,
-    gameweek: gw,
-    match_key,
-    home_score: scores.home !== undefined ? scores.home : null,
-    away_score: scores.away !== undefined ? scores.away : null,
-    updated_at: new Date().toISOString()
+async function saveMyPredictions(gw,preds) {
+  const rows=Object.entries(preds).map(([match_key,scores])=>({
+    user_id:currentUser.id,gameweek:gw,match_key,
+    home_score:scores.home!==undefined?scores.home:null,
+    away_score:scores.away!==undefined?scores.away:null,
+    updated_at:new Date().toISOString()
   }));
-  const { error } = await sb.from('predictions').upsert(rows, { onConflict: 'user_id,gameweek,match_key' });
+  const {error}=await sb.from('predictions').upsert(rows,{onConflict:'user_id,gameweek,match_key'});
   return !error;
 }
 
-// ── Render ────────────────────────────────────────────────────────────────────
+async function syncResultsToSupabase(gw, liveMatches) {
+  // Store finished results in Supabase results table
+  const finished = liveMatches.filter(m=>m.status==='FINISHED');
+  if(!finished.length) return;
+  const rows = finished.map((m,i)=>{
+    const home=m.homeTeam?.shortName||m.homeTeam?.name||'Home';
+    const away=m.awayTeam?.shortName||m.awayTeam?.name||'Away';
+    return {
+      gameweek: gw,
+      match_key: `${i}_${home}_${away}`,
+      home_score: m.score?.fullTime?.home,
+      away_score: m.score?.fullTime?.away,
+      status: 'finished'
+    };
+  });
+  await sb.from('results').upsert(rows,{onConflict:'gameweek,match_key'});
+}
+
+// ── Main render ───────────────────────────────────────────────────────────────
 async function fetchAndRenderFixtures() {
-  const section = document.getElementById('fixtures-section');
-  const allMatches = await fetchFixtures();
+  const section=document.getElementById('fixtures-section');
+  const allMatches=await fetchFixtures();
 
-  if (!allMatches) {
-    section.innerHTML = `<div class="state-box fade-in">
-      <div class="no-gw-msg">⚠ Could not load fixtures</div>
-      <div style="font-size:0.8rem">Unable to reach the fixtures API. Please try refreshing.</div>
-    </div>`;
+  if(!allMatches){
+    section.innerHTML=`<div class="state-box fade-in"><div class="no-gw-msg">⚠ Could not load fixtures</div><div style="font-size:0.8rem">Unable to reach the fixtures API. Please try refreshing.</div></div>`;
     return;
   }
 
-  const weekend = filterWeekendMatches(allMatches);
-  if (!weekend.length) {
-    section.innerHTML = `<div class="state-box fade-in">
-      <div class="no-gw-msg">No fixtures this weekend</div>
-      <div style="font-size:0.8rem">No Premier League games scheduled. Check back on Monday.</div>
-    </div>`;
+  const weekend=filterWeekendMatches(allMatches);
+  if(!weekend.length){
+    section.innerHTML=`<div class="state-box fade-in"><div class="no-gw-msg">No fixtures this weekend</div><div style="font-size:0.8rem">No Premier League games scheduled. Check back on Monday.</div></div>`;
     return;
   }
 
-  currentMatches = weekend;
-  currentGW = estimateGWNumber(weekend);
+  currentMatches=weekend;
+  currentGW=estimateGWNumber(weekend);
 
-  // Load all predictions with names
-  allPredictions = await loadAllPredictions(currentGW);
-  const myPreds = allPredictions[currentPlayerName] || {};
+  // Load predictions
+  allPredictions=await loadAllPredictions(currentGW);
+  const myPreds=allPredictions[currentPlayerName]||{};
 
-  const deadline = weekend.map(m => new Date(m.utcDate)).sort((a,b)=>a-b)[0];
-  const isOpen = new Date() < deadline;
+  const deadline=weekend.map(m=>new Date(m.utcDate)).sort((a,b)=>a-b)[0];
+  const now=new Date();
+  deadlinePassed=now>=deadline;
 
-  section.innerHTML = `
+  // Fetch live scores if deadline passed
+  let liveMatches=[];
+  if(deadlinePassed){
+    liveMatches=await fetchLiveMatches(currentGW);
+    await syncResultsToSupabase(currentGW, liveMatches);
+    buildLiveResults(liveMatches);
+  }
+
+  renderMatchesView(myPreds, deadline, liveMatches);
+
+  // Auto-refresh every 60s during live weekend
+  if(refreshTimer) clearInterval(refreshTimer);
+  if(deadlinePassed){
+    refreshTimer=setInterval(async()=>{
+      const live=await fetchLiveMatches(currentGW);
+      await syncResultsToSupabase(currentGW, live);
+      buildLiveResults(live);
+      const updatedPreds=allPredictions[currentPlayerName]||{};
+      renderMatchesView(updatedPreds, deadline, live);
+    }, 60000);
+  }
+}
+
+function buildLiveResults(liveMatches) {
+  liveResults={};
+  liveMatches.forEach((m,i)=>{
+    const home=m.homeTeam?.shortName||m.homeTeam?.name||'Home';
+    const away=m.awayTeam?.shortName||m.awayTeam?.name||'Away';
+    const key=`${i}_${home}_${away}`;
+    liveResults[key]={
+      home: m.score?.fullTime?.home??m.score?.halfTime?.home??null,
+      away: m.score?.fullTime?.away??m.score?.halfTime?.away??null,
+      status: m.status // SCHEDULED, IN_PLAY, PAUSED, FINISHED
+    };
+  });
+}
+
+function renderMatchesView(myPreds, deadline, liveMatches) {
+  const section=document.getElementById('fixtures-section');
+  const now=new Date();
+  const isOpen=now<deadline;
+  const hasLive=liveMatches.some(m=>m.status==='IN_PLAY'||m.status==='PAUSED');
+
+  // Calculate running points for current player
+  let totalPts=0, correctScores=0, correctResults=0;
+  if(deadlinePassed){
+    currentMatches.forEach((m,i)=>{
+      const home=m.homeTeam?.shortName||m.homeTeam?.name||'Home';
+      const away=m.awayTeam?.shortName||m.awayTeam?.name||'Away';
+      const key=`${i}_${home}_${away}`;
+      const pred=myPreds[key];
+      const res=liveResults[key];
+      if(pred&&res&&res.home!==null){
+        const pts=calcPoints(pred.home,pred.away,res.home,res.away);
+        if(pts===3){totalPts+=3;correctScores++;}
+        else if(pts===1){totalPts+=1;correctResults++;}
+      }
+    });
+  }
+
+  section.innerHTML='';
+  section.classList.add('fade-in');
+
+  const pillClass=isOpen?'ok':hasLive?'live':'';
+  const pillText=isOpen?'✓ Open · Deadline '+deadline.toLocaleDateString('en-GB',{weekday:'short'})+' '+deadline.toLocaleTimeString('en-GB',{hour:'2-digit',minute:'2-digit'}):hasLive?'● Live now':'✗ Closed';
+
+  section.innerHTML=`
     <div class="gw-header">
       <div>
         <div class="gw-title">Gameweek ${currentGW}</div>
-        <div class="gw-date">${weekend.length} fixtures · ${new Date(weekend[0].utcDate).toLocaleDateString('en-GB',{day:'numeric',month:'long',year:'numeric'})}</div>
+        <div class="gw-date">${currentMatches.length} fixtures · ${new Date(currentMatches[0].utcDate).toLocaleDateString('en-GB',{day:'numeric',month:'long',year:'numeric'})}</div>
       </div>
-      <span class="deadline-pill ${isOpen?'ok':''}">
-        ${isOpen ? '✓ Open' : '✗ Closed'} · Deadline ${deadline.toLocaleDateString('en-GB',{weekday:'short'})} ${deadline.toLocaleTimeString('en-GB',{hour:'2-digit',minute:'2-digit'})}
-      </span>
+      <span class="deadline-pill ${pillClass}">${pillText}</span>
     </div>
-    <div class="section-label">Your predictions — ${currentPlayerName}</div>
+    ${deadlinePassed ? `<div class="pts-summary">
+      <div class="pts-stat"><div class="pts-stat-num">${totalPts}</div><div class="pts-stat-label">Points this GW</div></div>
+      <div class="pts-stat"><div class="pts-stat-num" style="color:var(--green)">${correctScores}</div><div class="pts-stat-label">Correct scores</div></div>
+      <div class="pts-stat"><div class="pts-stat-num" style="color:var(--amber)">${correctResults}</div><div class="pts-stat-label">Correct results</div></div>
+    </div>` : ''}
+    <div class="section-label">${deadlinePassed ? 'Results & your predictions' : 'Your predictions — '+currentPlayerName}</div>
     <div class="fixture-list" id="fixture-list"></div>
-    ${isOpen
-      ? `<div class="save-bar">
-          <button class="btn-save" id="save-btn" onclick="savePredictions()">Save my predictions</button>
-          <span class="save-msg" id="save-msg">✓ Saved!</span>
-        </div>`
-      : `<div style="margin-top:1rem;font-size:0.78rem;color:var(--muted)">Predictions are locked — deadline has passed.</div>`
-    }
+    ${isOpen ? `<div class="save-bar">
+      <button class="btn-save" id="save-btn" onclick="savePredictions()">Save my predictions</button>
+      <span class="save-msg" id="save-msg">✓ Saved!</span>
+    </div>` : !deadlinePassed ? `<div style="margin-top:1rem;font-size:0.78rem;color:var(--muted)">Predictions locked — deadline has passed.</div>` : ''}
   `;
 
-  section.classList.add('fade-in');
+  const list=document.getElementById('fixture-list');
+  currentMatches.forEach((m,i)=>{
+    const home=m.homeTeam?.shortName||m.homeTeam?.name||'Home';
+    const away=m.awayTeam?.shortName||m.awayTeam?.name||'Away';
+    const key=`${i}_${home}_${away}`;
+    const pred=myPreds[key];
+    const res=liveResults[key];
+    const pts=res&&pred?calcPoints(pred.home,pred.away,res.home,res.away):null;
 
-  const list = document.getElementById('fixture-list');
-  weekend.forEach((m, i) => {
-    const home = m.homeTeam?.shortName || m.homeTeam?.name || 'Home';
-    const away = m.awayTeam?.shortName || m.awayTeam?.name || 'Away';
-    const key = `${i}_${home}_${away}`;
-    const eh = myPreds[key]?.home;
-    const ea = myPreds[key]?.away;
-    const card = document.createElement('div');
-    card.className = 'fixture-card';
-    card.innerHTML = `
-      <div class="fixture-team home">${home}</div>
-      <div>
-        <div class="score-inputs">
-          <input class="score-input" type="number" min="0" max="20" placeholder="–"
-            data-key="${key}" data-side="home"
-            value="${eh !== undefined ? eh : ''}" ${!isOpen ? 'disabled' : ''}>
-          <span class="score-sep">:</span>
-          <input class="score-input" type="number" min="0" max="20" placeholder="–"
-            data-key="${key}" data-side="away"
-            value="${ea !== undefined ? ea : ''}" ${!isOpen ? 'disabled' : ''}>
-        </div>
-        <div class="fixture-time">${formatMatchTime(m.utcDate)}</div>
-      </div>
-      <div class="fixture-team away">${away}</div>
-    `;
+    let cardClass='fixture-card';
+    if(pts===3) cardClass+=' correct-score';
+    else if(pts===1) cardClass+=' correct-result';
+    else if(pts===0) cardClass+=' wrong';
+    if(res?.status==='IN_PLAY'||res?.status==='PAUSED') cardClass+=' live-now';
+
+    const scoreArea = deadlinePassed
+      ? `<div>
+          <div class="live-score">
+            <span class="live-score-num">${res?.home??'–'}</span>
+            <span class="live-score-sep">:</span>
+            <span class="live-score-num">${res?.away??'–'}</span>
+          </div>
+          ${res?.status==='IN_PLAY'?'<div class="live-badge">LIVE</div>':''}
+          ${res?.status==='PAUSED'?'<div class="live-badge">HT</div>':''}
+          ${pts!==null?`<div class="result-badge pts-${pts}">${pts===3?'✓ +3pts':pts===1?'~ +1pt':'✗ 0pts'}</div>`:'<div class="result-badge" style="color:var(--muted);font-size:0.6rem">'+formatMatchTime(m.utcDate)+'</div>'}
+          ${pred!==undefined&&pred.home!==undefined?`<div style="font-size:0.62rem;color:var(--muted);text-align:center;margin-top:2px">You: ${pred.home}–${pred.away}</div>`:'<div style="font-size:0.62rem;color:var(--red);text-align:center;margin-top:2px">No prediction</div>'}
+        </div>`
+      : `<div>
+          <div class="score-inputs">
+            <input class="score-input" type="number" min="0" max="20" placeholder="–" data-key="${key}" data-side="home" value="${pred?.home!==undefined?pred.home:''}">
+            <span class="score-sep">:</span>
+            <input class="score-input" type="number" min="0" max="20" placeholder="–" data-key="${key}" data-side="away" value="${pred?.away!==undefined?pred.away:''}">
+          </div>
+          <div class="fixture-time">${formatMatchTime(m.utcDate)}</div>
+        </div>`;
+
+    const card=document.createElement('div');
+    card.className=cardClass;
+    card.innerHTML=`<div class="fixture-team home">${home}</div>${scoreArea}<div class="fixture-team away">${away}</div>`;
     list.appendChild(card);
   });
 
@@ -831,70 +700,89 @@ async function fetchAndRenderFixtures() {
 }
 
 async function savePredictions() {
-  const preds = {};
-  document.querySelectorAll('.score-input').forEach(inp => {
-    const key = inp.dataset.key;
-    const side = inp.dataset.side;
-    if (!preds[key]) preds[key] = {};
-    if (inp.value !== '') preds[key][side] = parseInt(inp.value);
+  const preds={};
+  document.querySelectorAll('.score-input').forEach(inp=>{
+    const key=inp.dataset.key,side=inp.dataset.side;
+    if(!preds[key])preds[key]={};
+    if(inp.value!=='')preds[key][side]=parseInt(inp.value);
   });
-
-  const btn = document.getElementById('save-btn');
-  btn.disabled = true; btn.textContent = 'Saving…';
-  const ok = await saveMyPredictions(currentGW, preds);
-  btn.disabled = false; btn.textContent = 'Save my predictions';
-
-  if (ok) {
-    const msg = document.getElementById('save-msg');
+  const btn=document.getElementById('save-btn');
+  btn.disabled=true;btn.textContent='Saving…';
+  const ok=await saveMyPredictions(currentGW,preds);
+  btn.disabled=false;btn.textContent='Save my predictions';
+  if(ok){
+    const msg=document.getElementById('save-msg');
     msg.classList.add('show');
-    setTimeout(() => msg.classList.remove('show'), 2500);
-    allPredictions[currentPlayerName] = preds;
+    setTimeout(()=>msg.classList.remove('show'),2500);
+    allPredictions[currentPlayerName]=preds;
     renderSummary(preds);
   }
 }
 
 function renderSummary(myPreds) {
-  const section = document.getElementById('summary-section');
-  if (!currentMatches.length) { section.style.display = 'none'; return; }
-  section.style.display = '';
+  const section=document.getElementById('summary-section');
+  if(!currentMatches.length){section.style.display='none';return;}
 
-  const allKeys = currentMatches.map((m, i) => {
-    const home = m.homeTeam?.shortName || m.homeTeam?.name || 'Home';
-    const away = m.awayTeam?.shortName || m.awayTeam?.name || 'Away';
-    return { key: `${i}_${home}_${away}`, label: `${home} v ${away}` };
+  const allKeys=currentMatches.map((m,i)=>{
+    const home=m.homeTeam?.shortName||m.homeTeam?.name||'Home';
+    const away=m.awayTeam?.shortName||m.awayTeam?.name||'Away';
+    return {key:`${i}_${home}_${away}`,label:`${home} v ${away}`};
   });
 
-  document.getElementById('pred-thead').innerHTML = `<tr>
+  if(!deadlinePassed){
+    // Show notice that predictions are hidden until kick-off
+    section.style.display='';
+    document.getElementById('pred-thead').innerHTML='';
+    document.getElementById('pred-tbody').innerHTML='';
+    section.innerHTML=`<div class="hidden-notice" style="margin-top:1.5rem">
+      <strong>Predictions are hidden</strong> until the first game kicks off. Once the deadline passes, everyone's picks will be revealed here.
+    </div>`;
+    return;
+  }
+
+  section.style.display='';
+
+  // Re-add the table if it was replaced by the notice
+  if(!document.getElementById('pred-thead')){
+    section.innerHTML=`<div class="section-label" style="margin-top:2rem">All predictions this gameweek</div>
+    <div class="predictions-summary">
+      <table class="pred-table"><thead id="pred-thead"></thead><tbody id="pred-tbody"></tbody></table>
+    </div>`;
+  }
+
+  document.getElementById('pred-thead').innerHTML=`<tr>
     <th>Player</th>
-    ${allKeys.map(({label}) => `<th>${label}</th>`).join('')}
+    ${allKeys.map(({label})=>`<th>${label}</th>`).join('')}
+    <th>GW pts</th>
   </tr>`;
 
-  // Show all players in leaderboard order
-  const rows = PLAYERS.map(name => {
-    const preds = allPredictions[name] || {};
-    const isMe = name === currentPlayerName;
-    return `<tr ${isMe ? 'class="my-row"' : ''}>
-      <td style="font-weight:${isMe?'600':'500'}">${name}${isMe ? ' <span class="you-badge">YOU</span>' : ''}</td>
-      ${allKeys.map(({key}) => {
-        const h = preds[key]?.home;
-        const a = preds[key]?.away;
-        const has = h !== undefined && a !== undefined;
-        return `<td><span class="pred-chip ${has?'':'empty'}">${has ? `${h} – ${a}` : '–'}</span></td>`;
-      }).join('')}
+  const rows=PLAYERS.map(name=>{
+    const preds=allPredictions[name]||{};
+    const isMe=name===currentPlayerName;
+    let gwTotal=0;
+    const cells=allKeys.map(({key})=>{
+      const h=preds[key]?.home,a=preds[key]?.away;
+      const has=h!==undefined&&a!==undefined;
+      const res=liveResults[key];
+      const pts=res&&has?calcPoints(h,a,res.home,res.away):null;
+      if(pts===3)gwTotal+=3;
+      else if(pts===1)gwTotal+=1;
+      const chipClass=pts===3?'pred-chip chip-correct-score':pts===1?'pred-chip chip-correct-result':pts===0?'pred-chip chip-wrong':'pred-chip';
+      return `<td><span class="${has?chipClass:'pred-chip empty'}">${has?`${h}–${a}`:'–'}</span></td>`;
+    }).join('');
+    return `<tr ${isMe?'class="my-row"':''}>
+      <td style="font-weight:${isMe?'600':'500'}">${name}${isMe?' <span class="you-badge">YOU</span>':''}</td>
+      ${cells}
+      <td style="font-family:'Bebas Neue',sans-serif;font-size:1.2rem;color:var(--green)">${gwTotal}</td>
     </tr>`;
   }).join('');
 
-  document.getElementById('pred-tbody').innerHTML = rows;
+  document.getElementById('pred-tbody').innerHTML=rows;
 }
 
 // ── Boot ──────────────────────────────────────────────────────────────────────
-sb.auth.getSession().then(({ data: { session } }) => {
-  if (session?.user) loadApp(session.user);
-});
-
-sb.auth.onAuthStateChange((event, session) => {
-  if (event === 'SIGNED_IN' && session?.user) loadApp(session.user);
-});
+sb.auth.getSession().then(({data:{session}})=>{if(session?.user)loadApp(session.user);});
+sb.auth.onAuthStateChange((event,session)=>{if(event==='SIGNED_IN'&&session?.user)loadApp(session.user);});
 </script>
 </body>
 </html>
