@@ -445,7 +445,7 @@ async function renderLeaderboard() {
 
 // ── API ───────────────────────────────────────────────────────────────────────
 async function fetchFixtures() {
-  const apiUrl='https://api.football-data.org/v4/competitions/PL/matches?status=SCHEDULED';
+  const apiUrl='https://api.football-data.org/v4/competitions/PL/matches?status=SCHEDULED,TIMED';
   const proxyUrl='https://corsproxy.io/?'+encodeURIComponent(apiUrl);
   try {
     const res=await fetch(proxyUrl,{headers:{'X-Auth-Token':'06f21e4fcbf44c9984aa595874172fa2'}});
