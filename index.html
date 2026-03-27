@@ -611,7 +611,8 @@ const storeKey = gw => `gtw_gw${gw}`;
 
 async function fetchFixtures() {
   // football-data.org v4 – free tier, PL competition id = 2021
-  const url = 'https://api.football-data.org/v4/competitions/PL/matches?status=SCHEDULED';
+  const apiUrl = 'https://api.football-data.org/v4/competitions/PL/matches?status=SCHEDULED';
+  const url = 'https://corsproxy.io/?' + encodeURIComponent(apiUrl);
   try {
     const res = await fetch(url, {
       headers: { 'X-Auth-Token': '06f21e4fcbf44c9984aa595874172fa2' }
