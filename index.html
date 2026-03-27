@@ -328,7 +328,8 @@ async function signOut() {
 
 async function loadApp(user) {
   currentUser=user;
-  const {data:profile}=await sb.from('profiles').select('player_name').eq('id',user.id).single();
+  const {data:profileRows}=await sb.from('profiles').select('player_name').eq('id',user.id);
+  const profile=profileRows&&profileRows.length?profileRows[0]:null;
   currentPlayerName=profile?.player_name||user.user_metadata?.player_name||user.email.split('@')[0];
   document.getElementById('auth-screen').style.display='none';
   document.getElementById('app-screen').style.display='block';
@@ -362,8 +363,12 @@ async function renderLeaderboard() {
 
   // Load all completed results from Supabase
   const {data: results} = await sb.from('results').select('*').eq('status','finished');
-  const {data: allPreds} = await sb.from('predictions')
-    .select('user_id, gameweek, match_key, home_score, away_score, profiles(player_name)');
+  const [{data: allPreds},{data: allProfiles}] = await Promise.all([
+    sb.from('predictions').select('user_id, gameweek, match_key, home_score, away_score'),
+    sb.from('profiles').select('id, player_name')
+  ]);
+  const profileMap={};
+  (allProfiles||[]).forEach(p=>{ profileMap[p.id]=p.player_name; });
 
   // Build points per player per GW from Supabase
   const gwPoints = {}; // { playerName: { gw: pts } }
@@ -374,7 +379,7 @@ async function renderLeaderboard() {
     results.forEach(r => { resultMap[`${r.gameweek}_${r.match_key}`] = r; });
 
     allPreds.forEach(p => {
-      const name = p.profiles?.player_name;
+      const name = profileMap[p.user_id];
       if(!name) return;
       const r = resultMap[`${p.gameweek}_${p.match_key}`];
       if(!r) return;
@@ -530,13 +535,20 @@ function estimateGWNumber(matches) {
 
 // ── Supabase predictions ───────────────────────────────────────────────────────
 async function loadAllPredictions(gw) {
-  const {data,error}=await sb.from('predictions')
-    .select('match_key,home_score,away_score,profiles(player_name)')
-    .eq('gameweek',gw);
-  if(error){console.error(error);return{};}
+  // Fetch predictions and profiles separately to avoid join issues
+  const [{data:preds,error:predErr},{data:profiles,error:profErr}] = await Promise.all([
+    sb.from('predictions').select('user_id,match_key,home_score,away_score').eq('gameweek',gw),
+    sb.from('profiles').select('id,player_name')
+  ]);
+  if(predErr||profErr){console.error(predErr||profErr);return{};}
+
+  // Build user_id -> player_name map
+  const nameMap={};
+  (profiles||[]).forEach(p=>{ nameMap[p.id]=p.player_name; });
+
   const result={};
-  data.forEach(row=>{
-    const name=row.profiles?.player_name||'Unknown';
+  (preds||[]).forEach(row=>{
+    const name=nameMap[row.user_id]||'Unknown';
     if(!result[name])result[name]={};
     result[name][row.match_key]={home:row.home_score,away:row.away_score};
   });
