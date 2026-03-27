@@ -457,12 +457,11 @@ async function fetchFixtures() {
 
 async function fetchLiveMatches(gw) {
   // Fetch in-play and finished matches for current gameweek window
-  // Use the first match in currentMatches as anchor, Sat-Mon window
+  // Use currentMatches anchor to build Sat-Sun window
   const anchor=currentMatches.length?new Date(currentMatches[0].utcDate):new Date();
   const dow=anchor.getDay();
-  const daysBackToSat=dow===6?0:dow===0?1:dow===1?2:6;
   const sat=new Date(anchor);
-  sat.setDate(anchor.getDate()-daysBackToSat);
+  if(dow===0) sat.setDate(anchor.getDate()-1);
   sat.setHours(0,0,0,0);
   const sun=new Date(sat);
   sun.setDate(sat.getDate()+1);
