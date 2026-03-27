@@ -444,113 +444,79 @@ async function renderLeaderboard() {
 }
 
 // ── API ───────────────────────────────────────────────────────────────────────
+
+// Returns the UK local weekday name for a UTC date string
+function ukWeekday(utcDate) {
+  return new Date(utcDate).toLocaleDateString('en-GB', {timeZone:'Europe/London', weekday:'long'});
+}
+
+// Returns UK local date string YYYY-MM-DD for a UTC date string
+function ukDateStr(utcDate) {
+  return new Date(utcDate).toLocaleDateString('en-GB', {timeZone:'Europe/London', year:'numeric', month:'2-digit', day:'2-digit'})
+    .split('/').reverse().join('-');
+}
+
+async function plFetch(url) {
+  const proxyUrl = 'https://corsproxy.io/?' + encodeURIComponent(url);
+  try {
+    const res = await fetch(proxyUrl, {headers:{'X-Auth-Token':'06f21e4fcbf44c9984aa595874172fa2'}});
+    if (!res.ok) throw new Error();
+    return await res.json();
+  } catch(e) { return null; }
+}
+
 async function fetchFixtures() {
-  const apiUrl='https://api.football-data.org/v4/competitions/PL/matches?status=SCHEDULED,TIMED';
-  const proxyUrl='https://corsproxy.io/?'+encodeURIComponent(apiUrl);
-  try {
-    const res=await fetch(proxyUrl,{headers:{'X-Auth-Token':'06f21e4fcbf44c9984aa595874172fa2'}});
-    if(!res.ok) throw new Error();
-    const data=await res.json();
-    return data.matches||[];
-  } catch(e){return null;}
+  const data = await plFetch('https://api.football-data.org/v4/competitions/PL/matches?status=SCHEDULED,TIMED');
+  return data ? data.matches : null;
 }
 
-async function fetchLiveMatches(gw) {
-  // Fetch in-play and finished matches for current gameweek window
-  // Use currentMatches anchor to build Sat-Sun window
-  const anchor=currentMatches.length?new Date(currentMatches[0].utcDate):new Date();
-  const dow=anchor.getDay();
-  const sat=new Date(anchor);
-  if(dow===0) sat.setDate(anchor.getDate()-1);
-  sat.setHours(0,0,0,0);
-  const sun=new Date(sat);
-  sun.setDate(sat.getDate()+1);
-  const dateFrom=sat.toISOString().slice(0,10);
-  const dateTo=sun.toISOString().slice(0,10);
-  const apiUrl=`https://api.football-data.org/v4/competitions/PL/matches?dateFrom=${dateFrom}&dateTo=${dateTo}`;
-  const proxyUrl='https://corsproxy.io/?'+encodeURIComponent(apiUrl);
-  try {
-    const res=await fetch(proxyUrl,{headers:{'X-Auth-Token':'06f21e4fcbf44c9984aa595874172fa2'}});
-    if(!res.ok) throw new Error();
-    const data=await res.json();
-    return data.matches||[];
-  } catch(e){return [];}
-}
-
-function getNextWeekendWindow() {
-  const now=new Date();
-  const day=now.getDay();
-  const daysToSat=(6-day+7)%7||7;
-  const sat=new Date(now);
-  sat.setDate(now.getDate()+daysToSat);
-  sat.setHours(0,0,0,0);
-  const mon=new Date(sat);
-  mon.setDate(sat.getDate()+2);
-  mon.setHours(23,59,59,999);
-  return {from:sat,to:mon};
+async function fetchLiveMatches() {
+  // Use the dates of the current gameweek's matches to build the date range
+  if (!currentMatches.length) return [];
+  const dates = currentMatches.map(m => ukDateStr(m.utcDate)).sort();
+  const data = await plFetch(
+    `https://api.football-data.org/v4/competitions/PL/matches?dateFrom=${dates[0]}&dateTo=${dates[dates.length-1]}`
+  );
+  return data ? data.matches : [];
 }
 
 function filterWeekendMatches(matches) {
   const now = new Date();
-  // Filter to future Sat/Sun matches only using UK local time
-  const weekendMatches = matches
+  // Keep only future Sat/Sun matches in UK local time
+  const satSun = matches
     .filter(m => {
-      const d = new Date(m.utcDate);
-      if (d <= now) return false;
-      const ukDay = d.toLocaleDateString('en-GB', {timeZone:'Europe/London', weekday:'long'});
-      return ukDay === 'Saturday' || ukDay === 'Sunday';
+      if (new Date(m.utcDate) <= now) return false;
+      const day = ukWeekday(m.utcDate);
+      return day === 'Saturday' || day === 'Sunday';
     })
     .sort((a, b) => new Date(a.utcDate) - new Date(b.utcDate));
 
-  if (!weekendMatches.length) return [];
+  if (!satSun.length) return [];
 
-  // Find the Saturday of the first upcoming weekend
-  const firstMatch = new Date(weekendMatches[0].utcDate);
-  const firstUKDay = firstMatch.toLocaleDateString('en-GB', {timeZone:'Europe/London', weekday:'long'});
-  
-  // Roll back to Saturday if first match is Sunday
-  const saturdayStart = new Date(firstMatch);
-  if (firstUKDay === 'Sunday') saturdayStart.setDate(firstMatch.getDate() - 1);
-  saturdayStart.setHours(0, 0, 0, 0);
-  
-  // Window ends Sunday night (48 hours from Saturday midnight)
-  const sundayEnd = new Date(saturdayStart.getTime() + 2 * 24 * 60 * 60 * 1000);
+  // Get the UK date of the first match — grab everything on that date + adjacent day
+  const firstDay = ukWeekday(satSun[0].utcDate); // 'Saturday' or 'Sunday'
+  const firstDate = ukDateStr(satSun[0].utcDate);
 
-  return weekendMatches.filter(m => {
-    const d = new Date(m.utcDate);
-    return d >= saturdayStart && d <= sundayEnd;
-  });
-}
-
-  // Find the Saturday of that round
-  const dow=anchor.getDay(); // 0=Sun,1=Mon,6=Sat
-  const daysBackToSat=dow===6?0:dow===0?1:dow===1?2:6; // Sat->0, Sun->1, Mon->2
-  const sat=new Date(anchor);
-  sat.setDate(anchor.getDate()-daysBackToSat);
-  sat.setHours(0,0,0,0);
-
-  // Window: Saturday and Sunday only
-  const sun=new Date(sat);
-  sun.setDate(sat.getDate()+1);
-  sun.setHours(23,59,59,999);
-
-  return matches.filter(m=>{
-    const d=new Date(m.utcDate);
-    return d>=sat && d<=sun;
+  // If first is Saturday, also include Sunday; if Sunday only, just that day
+  return satSun.filter(m => {
+    const day = ukWeekday(m.utcDate);
+    const date = ukDateStr(m.utcDate);
+    if (firstDay === 'Saturday') return day === 'Saturday' || day === 'Sunday';
+    return date === firstDate; // Sunday-only round
   });
 }
 
 function formatMatchTime(utcDate) {
-  const d=new Date(utcDate);
-  return d.toLocaleDateString('en-GB',{weekday:'short',day:'numeric',month:'short'})+
-    ' · '+d.toLocaleTimeString('en-GB',{hour:'2-digit',minute:'2-digit'});
+  const d = new Date(utcDate);
+  return d.toLocaleDateString('en-GB', {timeZone:'Europe/London', weekday:'short', day:'numeric', month:'short'}) +
+    ' · ' + d.toLocaleTimeString('en-GB', {timeZone:'Europe/London', hour:'2-digit', minute:'2-digit'});
 }
 
 function estimateGWNumber(matches) {
-  if(!matches.length) return 27;
-  const d=new Date(matches[0].utcDate);
-  const seasonStart=new Date('2025-08-16');
-  return Math.max(27,Math.ceil((d-seasonStart)/(7*24*60*60*1000)));
+  if (!matches.length) return 27;
+  const d = new Date(matches[0].utcDate);
+  const seasonStart = new Date('2025-08-16');
+  return Math.max(27, Math.ceil((d - seasonStart) / (7*24*60*60*1000)));
 }
 
 // ── Supabase predictions ───────────────────────────────────────────────────────
@@ -634,7 +600,7 @@ async function fetchAndRenderFixtures() {
   // Fetch live scores if deadline passed
   let liveMatches=[];
   if(deadlinePassed){
-    liveMatches=await fetchLiveMatches(currentGW);
+    liveMatches=await fetchLiveMatches();
     await syncResultsToSupabase(currentGW, liveMatches);
     buildLiveResults(liveMatches);
   }
@@ -645,7 +611,7 @@ async function fetchAndRenderFixtures() {
   if(refreshTimer) clearInterval(refreshTimer);
   if(deadlinePassed){
     refreshTimer=setInterval(async()=>{
-      const live=await fetchLiveMatches(currentGW);
+      const live=await fetchLiveMatches();
       await syncResultsToSupabase(currentGW, live);
       buildLiveResults(live);
       const updatedPreds=allPredictions[currentPlayerName]||{};
@@ -858,4 +824,5 @@ sb.auth.onAuthStateChange((event,session)=>{if(event==='SIGNED_IN'&&session?.use
 </script>
 </body>
 </html>
+
 
