@@ -595,6 +595,9 @@ async function fetchAndRenderFixtures() {
   }
 
   const weekend=filterWeekendMatches(allMatches);
+  console.log('All matches from API:', allMatches.length);
+  console.log('First 3 matches:', allMatches.slice(0,3).map(m=>({date:m.utcDate,home:m.homeTeam?.name,away:m.awayTeam?.name,status:m.status})));
+  console.log('Weekend matches found:', weekend.length);
   if(!weekend.length){
     section.innerHTML=`<div class="state-box fade-in"><div class="no-gw-msg">No fixtures this weekend</div><div style="font-size:0.8rem">No Premier League games scheduled. Check back on Monday.</div></div>`;
     return;
