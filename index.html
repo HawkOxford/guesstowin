@@ -482,7 +482,8 @@ async function fetchLiveMatches() {
 
 function filterWeekendMatches(matches) {
   const now = new Date();
-  // Keep only future Sat/Sun matches in UK local time
+
+  // Step 1: keep only future Saturday and Sunday matches in UK time
   const satSun = matches
     .filter(m => {
       if (new Date(m.utcDate) <= now) return false;
@@ -493,16 +494,26 @@ function filterWeekendMatches(matches) {
 
   if (!satSun.length) return [];
 
-  // Get the UK date of the first match — grab everything on that date + adjacent day
-  const firstDay = ukWeekday(satSun[0].utcDate); // 'Saturday' or 'Sunday'
-  const firstDate = ukDateStr(satSun[0].utcDate);
+  // Step 2: find the Saturday of the first upcoming Sat/Sun match
+  // If first match is a Sunday, the Saturday is the day before
+  const firstUKDate = ukDateStr(satSun[0].utcDate);
+  const firstDay = ukWeekday(satSun[0].utcDate);
 
-  // If first is Saturday, also include Sunday; if Sunday only, just that day
+  // Work out what Saturday date this weekend belongs to
+  const firstMatchDate = new Date(satSun[0].utcDate);
+  const satDate = new Date(firstMatchDate);
+  if (firstDay === 'Sunday') satDate.setUTCDate(satDate.getUTCDate() - 1);
+  const satDateStr = ukDateStr(satDate.toISOString());
+
+  // Step 3: calculate the Sunday date (day after Saturday)
+  const sunDate = new Date(satDate);
+  sunDate.setUTCDate(satDate.getUTCDate() + 1);
+  const sunDateStr = ukDateStr(sunDate.toISOString());
+
+  // Step 4: return only matches on that Saturday or Sunday
   return satSun.filter(m => {
-    const day = ukWeekday(m.utcDate);
-    const date = ukDateStr(m.utcDate);
-    if (firstDay === 'Saturday') return day === 'Saturday' || day === 'Sunday';
-    return date === firstDate; // Sunday-only round
+    const d = ukDateStr(m.utcDate);
+    return d === satDateStr || d === sunDateStr;
   });
 }
 
@@ -512,10 +523,18 @@ function formatMatchTime(utcDate) {
     ' · ' + d.toLocaleTimeString('en-GB', {timeZone:'Europe/London', hour:'2-digit', minute:'2-digit'});
 }
 
-function estimateGWNumber(matches) {
-  // Use the matchday field directly from the API
-  if (!matches.length) return 27;
-  return matches[0].matchday || 27;
+async function estimateGWNumber(matches) {
+  // The API uses 'matchday' which doesn't match our GW numbering.
+  // We know GW26 was the last completed round before we started tracking.
+  // Count distinct gameweeks already stored in Supabase results to get current GW.
+  const BASE_GW = 26;
+  try {
+    const { data } = await sb.from('results').select('gameweek');
+    const completedGWs = new Set((data || []).map(r => r.gameweek)).size;
+    return BASE_GW + completedGWs + 1;
+  } catch(e) {
+    return BASE_GW + 1;
+  }
 }
 
 // ── Supabase predictions ───────────────────────────────────────────────────────
@@ -586,7 +605,7 @@ async function fetchAndRenderFixtures() {
   }
 
   currentMatches=weekend;
-  currentGW=estimateGWNumber(weekend);
+  currentGW=await estimateGWNumber(weekend);
 
   // Load predictions
   allPredictions=await loadAllPredictions(currentGW);
@@ -757,64 +776,61 @@ async function savePredictions() {
 }
 
 function renderSummary(myPreds) {
-  const section=document.getElementById('summary-section');
-  if(!currentMatches.length){section.style.display='none';return;}
+  const section = document.getElementById('summary-section');
+  if (!currentMatches.length) { section.style.display = 'none'; return; }
 
-  const allKeys=currentMatches.map((m,i)=>{
-    const home=m.homeTeam?.shortName||m.homeTeam?.name||'Home';
-    const away=m.awayTeam?.shortName||m.awayTeam?.name||'Away';
-    return {key:`${i}_${home}_${away}`,label:`${home} v ${away}`};
+  const allKeys = currentMatches.map((m, i) => {
+    const home = m.homeTeam?.shortName || m.homeTeam?.name || 'Home';
+    const away = m.awayTeam?.shortName || m.awayTeam?.name || 'Away';
+    return { key: `${i}_${home}_${away}`, label: `${home} v ${away}` };
   });
 
-  if(!deadlinePassed){
-    // Show notice that predictions are hidden until kick-off
-    section.style.display='';
-    document.getElementById('pred-thead').innerHTML='';
-    document.getElementById('pred-tbody').innerHTML='';
-    section.innerHTML=`<div class="hidden-notice" style="margin-top:1.5rem">
-      <strong>Predictions are hidden</strong> until the first game kicks off. Once the deadline passes, everyone's picks will be revealed here.
+  // Before deadline: show hidden notice (always rebuild innerHTML cleanly)
+  if (!deadlinePassed) {
+    section.style.display = '';
+    section.innerHTML = `<div class="hidden-notice" style="margin-top:1.5rem">
+      <strong>Predictions are hidden</strong> until the first game kicks off. Everyone's picks are revealed once the deadline passes.
     </div>`;
     return;
   }
 
-  section.style.display='';
-
-  // Re-add the table if it was replaced by the notice
-  if(!document.getElementById('pred-thead')){
-    section.innerHTML=`<div class="section-label" style="margin-top:2rem">All predictions this gameweek</div>
+  // After deadline: always rebuild the table from scratch to avoid stale DOM
+  section.style.display = '';
+  section.innerHTML = `
+    <div class="section-label" style="margin-top:2rem">All predictions this gameweek</div>
     <div class="predictions-summary">
-      <table class="pred-table"><thead id="pred-thead"></thead><tbody id="pred-tbody"></tbody></table>
+      <table class="pred-table">
+        <thead><tr>
+          <th>Player</th>
+          ${allKeys.map(({label}) => `<th>${label}</th>`).join('')}
+          <th>GW pts</th>
+        </tr></thead>
+        <tbody>
+          ${PLAYERS.map(name => {
+            const preds = allPredictions[name] || {};
+            const isMe = name === currentPlayerName;
+            let gwTotal = 0;
+            const cells = allKeys.map(({key}) => {
+              const h = preds[key]?.home, a = preds[key]?.away;
+              const has = h !== undefined && a !== undefined;
+              const res = liveResults[key];
+              const pts = res && has ? calcPoints(h, a, res.home, res.away) : null;
+              if (pts === 3) gwTotal += 3;
+              else if (pts === 1) gwTotal += 1;
+              const chipClass = pts === 3 ? 'pred-chip chip-correct-score'
+                : pts === 1 ? 'pred-chip chip-correct-result'
+                : pts === 0 ? 'pred-chip chip-wrong' : 'pred-chip';
+              return `<td><span class="${has ? chipClass : 'pred-chip empty'}">${has ? `${h}–${a}` : '–'}</span></td>`;
+            }).join('');
+            return `<tr ${isMe ? 'class="my-row"' : ''}>
+              <td style="font-weight:${isMe ? '600' : '500'}">${name}${isMe ? ' <span class="you-badge">YOU</span>' : ''}</td>
+              ${cells}
+              <td style="font-family:'Bebas Neue',sans-serif;font-size:1.2rem;color:var(--green)">${gwTotal}</td>
+            </tr>`;
+          }).join('')}
+        </tbody>
+      </table>
     </div>`;
-  }
-
-  document.getElementById('pred-thead').innerHTML=`<tr>
-    <th>Player</th>
-    ${allKeys.map(({label})=>`<th>${label}</th>`).join('')}
-    <th>GW pts</th>
-  </tr>`;
-
-  const rows=PLAYERS.map(name=>{
-    const preds=allPredictions[name]||{};
-    const isMe=name===currentPlayerName;
-    let gwTotal=0;
-    const cells=allKeys.map(({key})=>{
-      const h=preds[key]?.home,a=preds[key]?.away;
-      const has=h!==undefined&&a!==undefined;
-      const res=liveResults[key];
-      const pts=res&&has?calcPoints(h,a,res.home,res.away):null;
-      if(pts===3)gwTotal+=3;
-      else if(pts===1)gwTotal+=1;
-      const chipClass=pts===3?'pred-chip chip-correct-score':pts===1?'pred-chip chip-correct-result':pts===0?'pred-chip chip-wrong':'pred-chip';
-      return `<td><span class="${has?chipClass:'pred-chip empty'}">${has?`${h}–${a}`:'–'}</span></td>`;
-    }).join('');
-    return `<tr ${isMe?'class="my-row"':''}>
-      <td style="font-weight:${isMe?'600':'500'}">${name}${isMe?' <span class="you-badge">YOU</span>':''}</td>
-      ${cells}
-      <td style="font-family:'Bebas Neue',sans-serif;font-size:1.2rem;color:var(--green)">${gwTotal}</td>
-    </tr>`;
-  }).join('');
-
-  document.getElementById('pred-tbody').innerHTML=rows;
 }
 
 // ── Boot ──────────────────────────────────────────────────────────────────────
