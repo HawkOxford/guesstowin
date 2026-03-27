@@ -651,7 +651,7 @@ async function fetchAndRenderFixtures() {
     buildLiveResults(liveMatches);
   }
 
-  renderMatchesView(myPreds, deadline, liveMatches);
+  renderMatchesView(myPreds, deadline, liveMatches, weekend);
 
   // Auto-refresh every 60s during live weekend
   if(refreshTimer) clearInterval(refreshTimer);
@@ -661,7 +661,7 @@ async function fetchAndRenderFixtures() {
       await syncResultsToSupabase(currentGW, live);
       buildLiveResults(live);
       const updatedPreds=allPredictions[currentPlayerName]||{};
-      renderMatchesView(updatedPreds, deadline, live);
+      renderMatchesView(updatedPreds, deadline, live, weekend);
     }, 60000);
   }
 }
@@ -694,7 +694,7 @@ function getGWDateLabel(matches) {
   return matches.length + ' fixtures · ' + days.join(' / ') + ' ' + year;
 }
 
-function renderMatchesView(myPreds, deadline, liveMatches) {
+function renderMatchesView(myPreds, deadline, liveMatches, weekend) {
   const section=document.getElementById('fixtures-section');
   const now=new Date();
   const isOpen=now<deadline;
