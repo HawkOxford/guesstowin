@@ -104,9 +104,10 @@
   .fixture-card.wrong { border-color: rgba(239,83,80,0.3); }
   .fixture-card.live-now { border-color: var(--amber); }
 
-  .fixture-team { font-weight: 500; font-size: 0.88rem; line-height: 1.2; }
-  .fixture-team.home { text-align: right; }
-  .fixture-team.away { text-align: left; }
+  .fixture-team { font-weight: 500; font-size: 0.88rem; line-height: 1.2; display: flex; align-items: center; gap: 0.5rem; }
+  .fixture-team.home { text-align: right; flex-direction: row-reverse; }
+  .fixture-team.away { text-align: left; flex-direction: row; }
+  .team-crest { width: 24px; height: 24px; object-fit: contain; flex-shrink: 0; }
   .fixture-time { font-size: 0.65rem; color: var(--muted); text-align: center; margin-top: 2px; }
 
   .score-inputs { display: flex; align-items: center; gap: 0.4rem; justify-content: center; }
@@ -746,9 +747,11 @@ function renderMatchesView(myPreds, deadline, liveMatches) {
           <div class="fixture-time">${formatMatchTime(m.utcDate)}</div>
         </div>`;
 
+    const homeCrest = m.homeTeam?.crest ? `<img class="team-crest" src="${m.homeTeam.crest}" alt="" onerror="this.style.display='none'">` : '';
+    const awayCrest = m.awayTeam?.crest ? `<img class="team-crest" src="${m.awayTeam.crest}" alt="" onerror="this.style.display='none'">` : '';
     const card=document.createElement('div');
     card.className=cardClass;
-    card.innerHTML=`<div class="fixture-team home">${home}</div>${scoreArea}<div class="fixture-team away">${away}</div>`;
+    card.innerHTML=`<div class="fixture-team home">${home}${homeCrest}</div>${scoreArea}<div class="fixture-team away">${awayCrest}${away}</div>`;
     list.appendChild(card);
   });
 
