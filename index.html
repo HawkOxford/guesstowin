@@ -5,6 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Guess to Win 2025/26</title>
 <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=DM+Sans:wght@300;400;500;700&display=swap" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <style>
   :root {
     --green: #00e676;
@@ -32,92 +33,217 @@
     overflow-x: hidden;
   }
 
-  /* Noise texture overlay */
-  body::before {
-    content: '';
-    position: fixed;
-    inset: 0;
-    background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)' opacity='0.04'/%3E%3C/svg%3E");
-    pointer-events: none;
-    z-index: 1000;
-    opacity: 0.4;
+  #auth-screen {
+    min-height: 100vh;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 2rem;
   }
+
+  .auth-card {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 16px;
+    padding: 2.5rem;
+    width: 100%;
+    max-width: 400px;
+  }
+
+  .auth-logo {
+    font-family: 'Bebas Neue', sans-serif;
+    font-size: 3rem;
+    line-height: 0.9;
+    margin-bottom: 0.3rem;
+  }
+
+  .auth-logo span { color: var(--green); }
+
+  .auth-subtitle {
+    font-size: 0.75rem;
+    color: var(--muted);
+    margin-bottom: 2rem;
+  }
+
+  .auth-label {
+    font-size: 0.72rem;
+    font-weight: 700;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: var(--muted);
+    display: block;
+    margin-bottom: 0.4rem;
+  }
+
+  .auth-input, .auth-select {
+    width: 100%;
+    background: var(--bg3);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    color: var(--text);
+    font-family: 'DM Sans', sans-serif;
+    font-size: 0.95rem;
+    padding: 0.75rem 1rem;
+    margin-bottom: 1.2rem;
+    transition: border-color 0.15s;
+    appearance: none;
+  }
+
+  .auth-select option { background: #1a231a; }
+
+  .auth-input:focus, .auth-select:focus {
+    outline: none;
+    border-color: var(--green);
+  }
+
+  .auth-btn {
+    width: 100%;
+    background: var(--green);
+    color: #031a03;
+    border: none;
+    border-radius: 8px;
+    padding: 0.85rem;
+    font-family: 'DM Sans', sans-serif;
+    font-weight: 700;
+    font-size: 0.95rem;
+    cursor: pointer;
+    transition: all 0.15s;
+    margin-bottom: 1rem;
+  }
+
+  .auth-btn:hover { background: #00ff88; }
+  .auth-btn:disabled { opacity: 0.5; cursor: not-allowed; }
+
+  .auth-toggle {
+    text-align: center;
+    font-size: 0.8rem;
+    color: var(--muted);
+  }
+
+  .auth-toggle a { color: var(--green); cursor: pointer; text-decoration: none; }
+
+  .auth-error {
+    background: rgba(239,83,80,0.1);
+    border: 1px solid rgba(239,83,80,0.3);
+    border-radius: 6px;
+    padding: 0.6rem 0.9rem;
+    font-size: 0.78rem;
+    color: var(--red);
+    margin-bottom: 1rem;
+    display: none;
+  }
+
+  .auth-success {
+    background: rgba(0,230,118,0.08);
+    border: 1px solid rgba(0,230,118,0.2);
+    border-radius: 6px;
+    padding: 0.6rem 0.9rem;
+    font-size: 0.78rem;
+    color: var(--green);
+    margin-bottom: 1rem;
+    display: none;
+  }
+
+  #app-screen { display: none; }
 
   header {
     border-bottom: 1px solid var(--border);
     background: linear-gradient(180deg, #0d150d 0%, var(--bg) 100%);
-    padding: 2rem 2rem 1.5rem;
+    padding: 1.5rem 2rem 0;
   }
 
-  .header-inner {
+  .header-top {
     max-width: 1100px;
     margin: 0 auto;
     display: flex;
-    align-items: flex-end;
-    gap: 1.5rem;
+    align-items: center;
+    justify-content: space-between;
     flex-wrap: wrap;
+    gap: 1rem;
+    margin-bottom: 1rem;
   }
 
-  .logo-group { flex: 1; min-width: 200px; }
-
-  .logo-eyebrow {
-    font-family: 'DM Sans', sans-serif;
-    font-size: 0.65rem;
-    font-weight: 700;
-    letter-spacing: 0.2em;
-    color: var(--green);
-    text-transform: uppercase;
-    margin-bottom: 0.3rem;
-  }
+  .logo-group { display: flex; align-items: baseline; gap: 1rem; }
 
   h1 {
     font-family: 'Bebas Neue', sans-serif;
-    font-size: clamp(3rem, 8vw, 5.5rem);
-    line-height: 0.9;
-    color: var(--text);
-    letter-spacing: 0.02em;
+    font-size: clamp(2rem, 5vw, 3.5rem);
+    line-height: 1;
   }
 
   h1 span { color: var(--green); }
 
-  .header-meta {
-    text-align: right;
+  .season-badge { font-size: 0.7rem; color: var(--muted); }
+
+  .user-area { display: flex; align-items: center; gap: 1rem; flex-wrap: wrap; }
+
+  .user-pill {
+    background: var(--bg3);
+    border: 1px solid var(--border);
+    border-radius: 20px;
+    padding: 0.35rem 0.9rem;
     font-size: 0.8rem;
-    color: var(--muted);
-    line-height: 1.8;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
   }
+
+  .user-dot { width: 7px; height: 7px; background: var(--green); border-radius: 50%; }
+
+  .sign-out-btn {
+    background: transparent;
+    border: 1px solid var(--border);
+    color: var(--muted);
+    border-radius: 6px;
+    padding: 0.35rem 0.8rem;
+    font-family: 'DM Sans', sans-serif;
+    font-size: 0.75rem;
+    cursor: pointer;
+    transition: all 0.15s;
+  }
+
+  .sign-out-btn:hover { border-color: var(--red); color: var(--red); }
 
   .champion-badge {
     display: inline-flex;
     align-items: center;
     gap: 0.4rem;
-    background: rgba(255, 213, 79, 0.08);
-    border: 1px solid rgba(255, 213, 79, 0.2);
+    background: rgba(255,213,79,0.08);
+    border: 1px solid rgba(255,213,79,0.2);
     border-radius: 4px;
     padding: 0.2rem 0.6rem;
     font-size: 0.72rem;
     color: var(--gold);
     font-weight: 500;
-    letter-spacing: 0.05em;
-    margin-top: 0.3rem;
   }
 
-  .main {
+  .tabs {
     max-width: 1100px;
     margin: 0 auto;
-    padding: 2rem;
-    display: grid;
-    grid-template-columns: 1fr 360px;
-    gap: 2rem;
-    align-items: start;
+    display: flex;
   }
 
-  @media (max-width: 860px) {
-    .main { grid-template-columns: 1fr; }
-    .sidebar { order: -1; }
+  .tab-btn {
+    background: transparent;
+    border: none;
+    border-bottom: 2px solid transparent;
+    color: var(--muted);
+    font-family: 'DM Sans', sans-serif;
+    font-size: 0.85rem;
+    font-weight: 500;
+    padding: 0.75rem 1.5rem;
+    cursor: pointer;
+    transition: all 0.15s;
   }
 
-  /* ─── Section headings ─── */
+  .tab-btn:hover { color: var(--text); }
+  .tab-btn.active { color: var(--green); border-bottom-color: var(--green); }
+
+  .tab-content { display: none; }
+  .tab-content.active { display: block; }
+
+  .main { max-width: 1100px; margin: 0 auto; padding: 2rem; }
+
   .section-label {
     font-size: 0.62rem;
     font-weight: 700;
@@ -130,19 +256,14 @@
     gap: 0.6rem;
   }
 
-  .section-label::after {
-    content: '';
-    flex: 1;
-    height: 1px;
-    background: var(--border);
-  }
+  .section-label::after { content: ''; flex: 1; height: 1px; background: var(--border); }
 
-  /* ─── Leaderboard ─── */
   .leaderboard-card {
     background: var(--card);
     border: 1px solid var(--border);
     border-radius: 10px;
     overflow: hidden;
+    max-width: 600px;
   }
 
   .lb-row {
@@ -153,482 +274,416 @@
     padding: 0.85rem 1.1rem;
     border-bottom: 1px solid var(--border);
     transition: background 0.15s;
-    position: relative;
   }
 
   .lb-row:last-child { border-bottom: none; }
   .lb-row:hover { background: rgba(0,230,118,0.03); }
+  .lb-row.top-1 { background: rgba(255,213,79,0.05); }
+  .lb-row.top-2 { background: rgba(176,190,197,0.03); }
+  .lb-row.top-3 { background: rgba(161,115,78,0.04); }
 
-  .lb-row.top-1 { background: rgba(255, 213, 79, 0.05); }
-  .lb-row.top-2 { background: rgba(176, 190, 197, 0.03); }
-  .lb-row.top-3 { background: rgba(161, 115, 78, 0.04); }
-
-  .lb-rank {
-    font-family: 'Bebas Neue', sans-serif;
-    font-size: 1.1rem;
-    text-align: center;
-  }
+  .lb-rank { font-family: 'Bebas Neue', sans-serif; font-size: 1.1rem; text-align: center; }
   .top-1 .lb-rank { color: var(--gold); }
   .top-2 .lb-rank { color: var(--silver); }
   .top-3 .lb-rank { color: var(--bronze); }
   .lb-row:not(.top-1):not(.top-2):not(.top-3) .lb-rank { color: var(--muted); }
 
   .lb-name { font-weight: 500; font-size: 0.9rem; }
-  .lb-weekly {
-    font-size: 0.72rem;
-    color: var(--muted);
-    text-align: right;
-  }
-  .lb-points {
-    font-family: 'Bebas Neue', sans-serif;
-    font-size: 1.4rem;
-    color: var(--green);
-    text-align: right;
-    line-height: 1;
-  }
+  .lb-weekly { font-size: 0.72rem; color: var(--muted); text-align: right; }
+  .lb-points { font-family: 'Bebas Neue', sans-serif; font-size: 1.4rem; color: var(--green); text-align: right; line-height: 1; }
 
   .tied-badge {
-    font-size: 0.58rem;
-    background: rgba(0,230,118,0.1);
-    color: var(--green);
-    border-radius: 3px;
-    padding: 1px 4px;
-    vertical-align: middle;
-    font-weight: 700;
-    letter-spacing: 0.05em;
-    margin-left: 4px;
+    font-size: 0.58rem; background: rgba(0,230,118,0.1); color: var(--green);
+    border-radius: 3px; padding: 1px 4px; font-weight: 700; letter-spacing: 0.05em; margin-left: 4px;
   }
 
-  /* ─── Fixtures / Prediction area ─── */
+  .you-badge {
+    font-size: 0.58rem; background: rgba(255,213,79,0.15); color: var(--gold);
+    border-radius: 3px; padding: 1px 4px; font-weight: 700; letter-spacing: 0.05em; margin-left: 4px;
+  }
+
   .gw-header {
-    display: flex;
-    align-items: baseline;
-    justify-content: space-between;
-    margin-bottom: 1rem;
-    flex-wrap: wrap;
-    gap: 0.5rem;
+    display: flex; align-items: baseline; justify-content: space-between;
+    margin-bottom: 1rem; flex-wrap: wrap; gap: 0.5rem;
   }
 
-  .gw-title {
-    font-family: 'Bebas Neue', sans-serif;
-    font-size: 2rem;
-    line-height: 1;
-  }
-
-  .gw-date {
-    font-size: 0.75rem;
-    color: var(--muted);
-  }
+  .gw-title { font-family: 'Bebas Neue', sans-serif; font-size: 2rem; line-height: 1; }
+  .gw-date { font-size: 0.75rem; color: var(--muted); }
 
   .deadline-pill {
-    font-size: 0.65rem;
-    font-weight: 700;
-    letter-spacing: 0.08em;
-    text-transform: uppercase;
-    background: rgba(239,83,80,0.1);
-    border: 1px solid rgba(239,83,80,0.3);
-    color: var(--red);
-    border-radius: 20px;
-    padding: 0.25rem 0.7rem;
+    font-size: 0.65rem; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase;
+    background: rgba(239,83,80,0.1); border: 1px solid rgba(239,83,80,0.3);
+    color: var(--red); border-radius: 20px; padding: 0.25rem 0.7rem;
   }
 
-  .deadline-pill.ok {
-    background: rgba(0,230,118,0.08);
-    border-color: rgba(0,230,118,0.2);
-    color: var(--green);
-  }
+  .deadline-pill.ok { background: rgba(0,230,118,0.08); border-color: rgba(0,230,118,0.2); color: var(--green); }
 
-  /* Player selector */
-  .player-selector {
-    display: flex;
-    gap: 0.5rem;
-    flex-wrap: wrap;
-    margin-bottom: 1.5rem;
-  }
-
-  .player-btn {
-    background: var(--card);
-    border: 1px solid var(--border);
-    color: var(--muted);
-    border-radius: 6px;
-    padding: 0.4rem 0.85rem;
-    font-family: 'DM Sans', sans-serif;
-    font-size: 0.8rem;
-    cursor: pointer;
-    transition: all 0.15s;
-  }
-
-  .player-btn:hover { border-color: var(--green-dim); color: var(--text); }
-  .player-btn.active {
-    background: rgba(0,230,118,0.1);
-    border-color: var(--green);
-    color: var(--green);
-    font-weight: 600;
-  }
-
-  /* Fixture cards */
   .fixture-list { display: flex; flex-direction: column; gap: 0.6rem; }
 
   .fixture-card {
-    background: var(--card);
-    border: 1px solid var(--border);
-    border-radius: 8px;
-    padding: 0.85rem 1rem;
-    display: grid;
-    grid-template-columns: 1fr auto 1fr;
-    align-items: center;
-    gap: 0.75rem;
-    transition: border-color 0.15s;
+    background: var(--card); border: 1px solid var(--border); border-radius: 8px;
+    padding: 0.85rem 1rem; display: grid; grid-template-columns: 1fr auto 1fr;
+    align-items: center; gap: 0.75rem;
   }
 
-  .fixture-card:hover { border-color: #2a3e2a; }
-
-  .fixture-team {
-    font-weight: 500;
-    font-size: 0.88rem;
-    line-height: 1.2;
-  }
+  .fixture-team { font-weight: 500; font-size: 0.88rem; line-height: 1.2; }
   .fixture-team.home { text-align: right; }
   .fixture-team.away { text-align: left; }
+  .fixture-time { font-size: 0.65rem; color: var(--muted); text-align: center; margin-top: 2px; }
 
-  .fixture-time {
-    font-size: 0.65rem;
-    color: var(--muted);
-    text-align: center;
-    margin-top: 2px;
-  }
-
-  .score-inputs {
-    display: flex;
-    align-items: center;
-    gap: 0.4rem;
-    justify-content: center;
-  }
+  .score-inputs { display: flex; align-items: center; gap: 0.4rem; justify-content: center; }
 
   .score-input {
-    width: 38px;
-    height: 38px;
-    background: var(--bg3);
-    border: 1px solid var(--border);
-    border-radius: 6px;
-    color: var(--text);
-    font-family: 'Bebas Neue', sans-serif;
-    font-size: 1.3rem;
-    text-align: center;
-    transition: border-color 0.15s, box-shadow 0.15s;
+    width: 38px; height: 38px; background: var(--bg3); border: 1px solid var(--border);
+    border-radius: 6px; color: var(--text); font-family: 'Bebas Neue', sans-serif;
+    font-size: 1.3rem; text-align: center; transition: border-color 0.15s, box-shadow 0.15s;
     -moz-appearance: textfield;
   }
 
   .score-input::-webkit-outer-spin-button,
   .score-input::-webkit-inner-spin-button { -webkit-appearance: none; }
-  .score-input:focus {
-    outline: none;
-    border-color: var(--green);
-    box-shadow: 0 0 0 2px rgba(0,230,118,0.15);
-  }
 
-  .score-sep {
-    color: var(--muted);
-    font-family: 'Bebas Neue', sans-serif;
-    font-size: 1.2rem;
-  }
+  .score-input:focus { outline: none; border-color: var(--green); box-shadow: 0 0 0 2px rgba(0,230,118,0.15); }
+  .score-input:disabled { opacity: 0.4; cursor: not-allowed; }
 
-  /* Save button */
-  .save-bar {
-    margin-top: 1.5rem;
-    display: flex;
-    align-items: center;
-    gap: 1rem;
-    flex-wrap: wrap;
-  }
+  .score-sep { color: var(--muted); font-family: 'Bebas Neue', sans-serif; font-size: 1.2rem; }
+
+  .save-bar { margin-top: 1.5rem; display: flex; align-items: center; gap: 1rem; flex-wrap: wrap; }
 
   .btn-save {
-    background: var(--green);
-    color: #031a03;
-    border: none;
-    border-radius: 7px;
-    padding: 0.75rem 2rem;
-    font-family: 'DM Sans', sans-serif;
-    font-weight: 700;
-    font-size: 0.9rem;
-    letter-spacing: 0.03em;
-    cursor: pointer;
-    transition: all 0.15s;
+    background: var(--green); color: #031a03; border: none; border-radius: 7px;
+    padding: 0.75rem 2rem; font-family: 'DM Sans', sans-serif; font-weight: 700;
+    font-size: 0.9rem; cursor: pointer; transition: all 0.15s;
   }
 
-  .btn-save:hover { background: #00ff88; transform: translateY(-1px); box-shadow: 0 4px 16px rgba(0,230,118,0.3); }
-  .btn-save:active { transform: translateY(0); }
+  .btn-save:hover { background: #00ff88; transform: translateY(-1px); }
+  .btn-save:disabled { opacity: 0.5; cursor: not-allowed; transform: none; }
 
-  .btn-clear {
-    background: transparent;
-    border: 1px solid var(--border);
-    color: var(--muted);
-    border-radius: 7px;
-    padding: 0.75rem 1.2rem;
-    font-family: 'DM Sans', sans-serif;
-    font-size: 0.85rem;
-    cursor: pointer;
-    transition: all 0.15s;
-  }
-  .btn-clear:hover { border-color: var(--muted); color: var(--text); }
-
-  .save-msg {
-    font-size: 0.8rem;
-    color: var(--green);
-    opacity: 0;
-    transition: opacity 0.3s;
-  }
+  .save-msg { font-size: 0.8rem; color: var(--green); opacity: 0; transition: opacity 0.3s; }
   .save-msg.show { opacity: 1; }
 
-  /* Predictions summary table */
-  .predictions-summary {
-    margin-top: 2rem;
-    overflow-x: auto;
-  }
+  .predictions-summary { margin-top: 2rem; overflow-x: auto; }
 
-  .pred-table {
-    width: 100%;
-    border-collapse: collapse;
-    font-size: 0.78rem;
-    min-width: 600px;
-  }
+  .pred-table { width: 100%; border-collapse: collapse; font-size: 0.78rem; min-width: 600px; }
 
   .pred-table th {
-    padding: 0.5rem 0.75rem;
-    text-align: left;
-    color: var(--muted);
-    font-weight: 500;
-    font-size: 0.65rem;
-    letter-spacing: 0.08em;
-    text-transform: uppercase;
+    padding: 0.5rem 0.75rem; text-align: left; color: var(--muted); font-weight: 500;
+    font-size: 0.65rem; letter-spacing: 0.08em; text-transform: uppercase;
     border-bottom: 1px solid var(--border);
   }
 
   .pred-table td {
-    padding: 0.55rem 0.75rem;
-    border-bottom: 1px solid rgba(31,46,31,0.5);
-    vertical-align: middle;
+    padding: 0.55rem 0.75rem; border-bottom: 1px solid rgba(31,46,31,0.5); vertical-align: middle;
   }
 
   .pred-table tr:last-child td { border-bottom: none; }
   .pred-table tr:hover td { background: rgba(0,230,118,0.02); }
+  .pred-table tr.my-row td { background: rgba(255,213,79,0.03); }
 
   .pred-chip {
-    display: inline-block;
-    background: var(--bg3);
-    border-radius: 4px;
-    padding: 2px 7px;
-    font-weight: 600;
-    font-size: 0.75rem;
+    display: inline-block; background: var(--bg3); border-radius: 4px;
+    padding: 2px 7px; font-weight: 600; font-size: 0.75rem;
   }
+
   .pred-chip.empty { color: var(--muted); font-weight: 400; font-style: italic; }
 
-  /* Rules callout */
   .rules-callout {
-    background: var(--bg3);
-    border: 1px solid var(--border);
-    border-left: 3px solid var(--green);
-    border-radius: 6px;
-    padding: 1rem 1.2rem;
-    margin-top: 1rem;
-    font-size: 0.78rem;
-    color: var(--muted);
-    line-height: 1.8;
+    background: var(--bg3); border: 1px solid var(--border); border-left: 3px solid var(--green);
+    border-radius: 6px; padding: 1rem 1.2rem; margin-top: 2rem;
+    font-size: 0.78rem; color: var(--muted); line-height: 1.8;
   }
 
   .rules-callout strong { color: var(--text); }
 
-  /* Loading / error states */
   .state-box {
-    background: var(--card);
-    border: 1px solid var(--border);
-    border-radius: 8px;
-    padding: 2.5rem;
-    text-align: center;
-    color: var(--muted);
+    background: var(--card); border: 1px solid var(--border); border-radius: 8px;
+    padding: 2.5rem; text-align: center; color: var(--muted);
   }
 
   .spinner {
-    width: 28px; height: 28px;
-    border: 2px solid var(--border);
-    border-top-color: var(--green);
-    border-radius: 50%;
-    animation: spin 0.8s linear infinite;
-    margin: 0 auto 1rem;
+    width: 28px; height: 28px; border: 2px solid var(--border); border-top-color: var(--green);
+    border-radius: 50%; animation: spin 0.8s linear infinite; margin: 0 auto 1rem;
   }
 
   @keyframes spin { to { transform: rotate(360deg); } }
 
-  .no-gw-msg {
-    font-family: 'Bebas Neue', sans-serif;
-    font-size: 1.8rem;
-    color: var(--muted);
-    margin-bottom: 0.5rem;
-  }
+  .no-gw-msg { font-family: 'Bebas Neue', sans-serif; font-size: 1.8rem; color: var(--muted); margin-bottom: 0.5rem; }
 
-  /* Responsive tweaks */
-  @media (max-width: 600px) {
-    header, .main { padding: 1.2rem; }
-    .fixture-card { grid-template-columns: 1fr auto 1fr; }
-    .score-input { width: 32px; height: 32px; font-size: 1.1rem; }
-  }
-
-  /* Fade-in animation */
   .fade-in { animation: fadeIn 0.4s ease both; }
   @keyframes fadeIn { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: translateY(0); } }
+
+  @media (max-width: 600px) {
+    header, .main { padding: 1.2rem; }
+    .score-input { width: 32px; height: 32px; font-size: 1.1rem; }
+    .champion-badge { display: none; }
+  }
 </style>
 </head>
 <body>
 
-<header>
-  <div class="header-inner">
-    <div class="logo-group">
-      <div class="logo-eyebrow">Premier League Prediction Game</div>
-      <h1>GUESS<br><span>TO WIN</span></h1>
-      <div style="font-size:0.75rem;color:var(--muted);margin-top:0.4rem;">2025 / 26 Season</div>
-    </div>
-    <div class="header-meta">
-      <div>£2 per week &nbsp;·&nbsp; £1 weekly pot &nbsp;·&nbsp; £1 season pot</div>
-      <div>Result = 1pt &nbsp;·&nbsp; Correct score = 3pts</div>
-      <div class="champion-badge">⭐ Reigning champion: Richard Tuck</div>
-    </div>
-  </div>
-</header>
+<!-- ─── Auth Screen ─── -->
+<div id="auth-screen">
+  <div class="auth-card">
+    <div class="auth-logo">GUESS <span>TO WIN</span></div>
+    <div class="auth-subtitle">2025/26 Season · Sign in to submit your predictions</div>
 
-<div class="main">
-  <!-- LEFT: Fixtures & Predictions -->
-  <div class="content">
+    <div id="auth-error" class="auth-error"></div>
+    <div id="auth-success" class="auth-success"></div>
 
-    <!-- Gameweek fixtures -->
-    <div id="fixtures-section">
-      <div class="state-box">
-        <div class="spinner"></div>
-        <div>Fetching Premier League fixtures…</div>
-      </div>
+    <!-- Sign In -->
+    <div id="signin-form">
+      <label class="auth-label">Email</label>
+      <input class="auth-input" type="email" id="signin-email" placeholder="your@email.com" onkeydown="if(event.key==='Enter')signIn()">
+      <label class="auth-label">Password</label>
+      <input class="auth-input" type="password" id="signin-password" placeholder="••••••••" onkeydown="if(event.key==='Enter')signIn()">
+      <button class="auth-btn" id="signin-btn" onclick="signIn()">Sign In</button>
+      <div class="auth-toggle">No account yet? <a onclick="showSignup()">Sign up here</a></div>
     </div>
 
-    <!-- Predictions summary table -->
-    <div id="summary-section" style="display:none">
-      <div class="section-label" style="margin-top:2rem">All predictions this gameweek</div>
-      <div class="predictions-summary">
-        <table class="pred-table" id="pred-table">
-          <thead id="pred-thead"></thead>
-          <tbody id="pred-tbody"></tbody>
-        </table>
-      </div>
-    </div>
-
-    <!-- Rules -->
-    <div class="rules-callout" style="margin-top:2rem">
-      <strong>Rules reminder:</strong> Scores must be submitted before the first game kicks off.
-      No changes after kick-off (unless you haven't submitted at all).
-      Correct result = <strong>1 point</strong> · Correct score = <strong>3 points</strong> · Cost: <strong>£2/week</strong>
+    <!-- Sign Up -->
+    <div id="signup-form" style="display:none">
+      <label class="auth-label">Who are you?</label>
+      <select class="auth-select" id="signup-player">
+        <option value="">— Select your name —</option>
+        <option>Jake</option>
+        <option>Glurk</option>
+        <option>Josh ☆</option>
+        <option>Richard ☆</option>
+        <option>Teflon</option>
+        <option>Alex</option>
+        <option>Gaz ☆</option>
+        <option>Liam</option>
+        <option>Craig</option>
+        <option>Marcus</option>
+      </select>
+      <label class="auth-label">Email</label>
+      <input class="auth-input" type="email" id="signup-email" placeholder="your@email.com">
+      <label class="auth-label">Password</label>
+      <input class="auth-input" type="password" id="signup-password" placeholder="Min 6 characters">
+      <button class="auth-btn" id="signup-btn" onclick="signUp()">Create Account</button>
+      <div class="auth-toggle">Already have an account? <a onclick="showSignin()">Sign in</a></div>
     </div>
   </div>
+</div>
 
-  <!-- RIGHT: Leaderboard -->
-  <div class="sidebar">
-    <div class="section-label">Leaderboard</div>
-    <div class="leaderboard-card">
-      <div class="lb-row top-1">
-        <div class="lb-rank">1</div>
-        <div class="lb-name">Marcus <span class="tied-badge">TIE</span></div>
-        <div class="lb-weekly"><div style="font-size:0.65rem">weekly £</div>£38.33</div>
-        <div class="lb-points">159</div>
+<!-- ─── Main App ─── -->
+<div id="app-screen">
+  <header>
+    <div class="header-top">
+      <div class="logo-group">
+        <h1>GUESS <span>TO WIN</span></h1>
+        <div class="season-badge">2025/26</div>
       </div>
-      <div class="lb-row top-1">
-        <div class="lb-rank">1</div>
-        <div class="lb-name">Richard ☆ <span class="tied-badge">TIE</span></div>
-        <div class="lb-weekly"><div style="font-size:0.65rem">weekly £</div>£38.33</div>
-        <div class="lb-points">159</div>
-      </div>
-      <div class="lb-row top-2">
-        <div class="lb-rank">3</div>
-        <div class="lb-name">Glurk</div>
-        <div class="lb-weekly"><div style="font-size:0.65rem">weekly £</div>£33.33</div>
-        <div class="lb-points">154</div>
-      </div>
-      <div class="lb-row top-3">
-        <div class="lb-rank">4</div>
-        <div class="lb-name">Jake</div>
-        <div class="lb-weekly"><div style="font-size:0.65rem">weekly £</div>£16.67</div>
-        <div class="lb-points">153</div>
-      </div>
-      <div class="lb-row">
-        <div class="lb-rank">5</div>
-        <div class="lb-name">Alex</div>
-        <div class="lb-weekly"><div style="font-size:0.65rem">weekly £</div>£16.67</div>
-        <div class="lb-points">149</div>
-      </div>
-      <div class="lb-row">
-        <div class="lb-rank">6</div>
-        <div class="lb-name">Teflon</div>
-        <div class="lb-weekly"><div style="font-size:0.65rem">weekly £</div>£48.33</div>
-        <div class="lb-points">147</div>
-      </div>
-      <div class="lb-row">
-        <div class="lb-rank">7</div>
-        <div class="lb-name">Josh ☆</div>
-        <div class="lb-weekly"><div style="font-size:0.65rem">weekly £</div>£20.00</div>
-        <div class="lb-points">143</div>
-      </div>
-      <div class="lb-row">
-        <div class="lb-rank">8</div>
-        <div class="lb-name">Gaz ☆</div>
-        <div class="lb-weekly"><div style="font-size:0.65rem">weekly £</div>£30.00</div>
-        <div class="lb-points">142</div>
-      </div>
-      <div class="lb-row">
-        <div class="lb-rank">9</div>
-        <div class="lb-name">Liam</div>
-        <div class="lb-weekly"><div style="font-size:0.65rem">weekly £</div>£3.33</div>
-        <div class="lb-points">138</div>
-      </div>
-      <div class="lb-row">
-        <div class="lb-rank">10</div>
-        <div class="lb-name">Craig</div>
-        <div class="lb-weekly"><div style="font-size:0.65rem">weekly £</div>£15.00</div>
-        <div class="lb-points">136</div>
+      <div class="user-area">
+        <div class="champion-badge">⭐ Reigning champion: Richard Tuck</div>
+        <div class="user-pill">
+          <div class="user-dot"></div>
+          <span id="user-name-display">...</span>
+        </div>
+        <button class="sign-out-btn" onclick="signOut()">Sign out</button>
       </div>
     </div>
+    <div class="tabs">
+      <button class="tab-btn active" onclick="switchTab('scores',this)">⚽ Scores</button>
+      <button class="tab-btn" onclick="switchTab('leaderboard',this)">🏆 Leaderboard</button>
+    </div>
+  </header>
 
-    <div style="margin-top:1rem;font-size:0.68rem;color:var(--muted);text-align:center;line-height:1.6">
-      After GW26 · Season pot accumulates at £1/player/week<br>
-      Weekly winner splits £10 if tied
+  <!-- Scores Tab -->
+  <div id="tab-scores" class="tab-content active">
+    <div class="main">
+      <div id="fixtures-section">
+        <div class="state-box"><div class="spinner"></div><div>Fetching fixtures…</div></div>
+      </div>
+      <div id="summary-section" style="display:none">
+        <div class="section-label" style="margin-top:2rem">All predictions this gameweek</div>
+        <div class="predictions-summary">
+          <table class="pred-table">
+            <thead id="pred-thead"></thead>
+            <tbody id="pred-tbody"></tbody>
+          </table>
+        </div>
+      </div>
+      <div class="rules-callout">
+        <strong>Rules reminder:</strong> Submit before the first game kicks off. No changes after kick-off (unless you haven't submitted at all).
+        Correct result = <strong>1pt</strong> · Correct score = <strong>3pts</strong> · Cost: <strong>£2/week</strong>
+      </div>
+    </div>
+  </div>
+
+  <!-- Leaderboard Tab -->
+  <div id="tab-leaderboard" class="tab-content">
+    <div class="main">
+      <div class="section-label">Season standings — after GW26</div>
+      <div class="leaderboard-card" id="leaderboard-card"></div>
+      <div style="margin-top:1rem;font-size:0.68rem;color:var(--muted);line-height:1.6">
+        Season pot accumulates at £1/player/week · Weekly winner splits £10 if tied
+      </div>
     </div>
   </div>
 </div>
 
 <script>
+const SUPABASE_URL = 'https://iufbdwsmbwrtcqzkvyey.supabase.co';
+const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Iml1ZmJkd3NtYndydGNxemt2eWV5Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzQ2MTg2MzcsImV4cCI6MjA5MDE5NDYzN30.Q3B-7qr4xWcGpa1UJWKSAd1iu6_-WHaiDcPV4HJ8SNk';
+const sb = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+
 const PLAYERS = ['Jake','Glurk','Josh ☆','Richard ☆','Teflon','Alex','Gaz ☆','Liam','Craig','Marcus'];
 
-// Storage keys
-const storeKey = gw => `gtw_gw${gw}`;
+const LEADERBOARD = [
+  { name: 'Marcus',     points: 159, weekly: '£38.33', tied: true },
+  { name: 'Richard ☆', points: 159, weekly: '£38.33', tied: true },
+  { name: 'Glurk',     points: 154, weekly: '£33.33' },
+  { name: 'Jake',      points: 153, weekly: '£16.67' },
+  { name: 'Alex',      points: 149, weekly: '£16.67' },
+  { name: 'Teflon',    points: 147, weekly: '£48.33' },
+  { name: 'Josh ☆',   points: 143, weekly: '£20.00' },
+  { name: 'Gaz ☆',    points: 142, weekly: '£30.00' },
+  { name: 'Liam',      points: 138, weekly: '£3.33'  },
+  { name: 'Craig',     points: 136, weekly: '£15.00' },
+];
 
-// ── Fixture fetching ──────────────────────────────────────────────────────────
-// We use the free football-data.org API (no auth needed for PL basic tier)
-// If that's blocked by CORS, we fall back to showing a manual input UI.
+let currentUser = null;
+let currentPlayerName = '';
+let currentGW = null;
+let currentMatches = [];
+let allPredictions = {}; // { playerName: { matchKey: {home,away} } }
 
-async function fetchFixtures() {
-  // football-data.org v4 – free tier, PL competition id = 2021
-  const apiUrl = 'https://api.football-data.org/v4/competitions/PL/matches?status=SCHEDULED';
-  const url = 'https://corsproxy.io/?' + encodeURIComponent(apiUrl);
-  try {
-    const res = await fetch(url, {
-      headers: { 'X-Auth-Token': '06f21e4fcbf44c9984aa595874172fa2' }
+// ── Auth helpers ──────────────────────────────────────────────────────────────
+function showError(msg) {
+  const el = document.getElementById('auth-error');
+  el.textContent = msg; el.style.display = 'block';
+  document.getElementById('auth-success').style.display = 'none';
+}
+
+function showSuccessMsg(msg) {
+  const el = document.getElementById('auth-success');
+  el.textContent = msg; el.style.display = 'block';
+  document.getElementById('auth-error').style.display = 'none';
+}
+
+function showSignup() {
+  document.getElementById('signin-form').style.display = 'none';
+  document.getElementById('signup-form').style.display = 'block';
+  document.getElementById('auth-error').style.display = 'none';
+  document.getElementById('auth-success').style.display = 'none';
+}
+
+function showSignin() {
+  document.getElementById('signup-form').style.display = 'none';
+  document.getElementById('signin-form').style.display = 'block';
+  document.getElementById('auth-error').style.display = 'none';
+  document.getElementById('auth-success').style.display = 'none';
+}
+
+async function signIn() {
+  const email = document.getElementById('signin-email').value.trim();
+  const password = document.getElementById('signin-password').value;
+  if (!email || !password) { showError('Please enter your email and password.'); return; }
+  const btn = document.getElementById('signin-btn');
+  btn.disabled = true; btn.textContent = 'Signing in…';
+  const { data, error } = await sb.auth.signInWithPassword({ email, password });
+  btn.disabled = false; btn.textContent = 'Sign In';
+  if (error) { showError(error.message); return; }
+  await loadApp(data.user);
+}
+
+async function signUp() {
+  const player = document.getElementById('signup-player').value;
+  const email = document.getElementById('signup-email').value.trim();
+  const password = document.getElementById('signup-password').value;
+  if (!player) { showError('Please select your name from the list.'); return; }
+  if (!email || !password) { showError('Please fill in all fields.'); return; }
+  if (password.length < 6) { showError('Password must be at least 6 characters.'); return; }
+
+  const btn = document.getElementById('signup-btn');
+  btn.disabled = true; btn.textContent = 'Creating account…';
+
+  const { data, error } = await sb.auth.signUp({
+    email, password,
+    options: { data: { player_name: player } }
+  });
+
+  btn.disabled = false; btn.textContent = 'Create Account';
+  if (error) { showError(error.message); return; }
+
+  // Insert into profiles table
+  if (data.user) {
+    await sb.from('profiles').upsert({
+      id: data.user.id,
+      player_name: player
     });
+  }
+
+  showSuccessMsg('Account created! Check your email to confirm, then sign in.');
+  showSignin();
+}
+
+async function signOut() {
+  await sb.auth.signOut();
+  document.getElementById('app-screen').style.display = 'none';
+  document.getElementById('auth-screen').style.display = 'flex';
+  currentUser = null; currentPlayerName = '';
+}
+
+async function loadApp(user) {
+  currentUser = user;
+
+  // Get player name from profiles table
+  const { data: profile } = await sb.from('profiles').select('player_name').eq('id', user.id).single();
+  currentPlayerName = profile?.player_name || user.user_metadata?.player_name || user.email.split('@')[0];
+
+  document.getElementById('auth-screen').style.display = 'none';
+  document.getElementById('app-screen').style.display = 'block';
+  document.getElementById('user-name-display').textContent = currentPlayerName;
+
+  renderLeaderboard();
+  fetchAndRenderFixtures();
+}
+
+// ── Tabs ──────────────────────────────────────────────────────────────────────
+function switchTab(tab, btn) {
+  document.querySelectorAll('.tab-content').forEach(t => t.classList.remove('active'));
+  document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+  document.getElementById('tab-' + tab).classList.add('active');
+  btn.classList.add('active');
+}
+
+// ── Leaderboard ───────────────────────────────────────────────────────────────
+function renderLeaderboard() {
+  const card = document.getElementById('leaderboard-card');
+  const rankClasses = ['top-1','top-1','top-2','top-3'];
+  card.innerHTML = LEADERBOARD.map((p, i) => {
+    const cls = rankClasses[i] || '';
+    const rank = i <= 1 ? 1 : i + 1;
+    const isMe = p.name === currentPlayerName;
+    return `<div class="lb-row ${cls}">
+      <div class="lb-rank">${rank}</div>
+      <div class="lb-name">${p.name}
+        ${p.tied ? '<span class="tied-badge">TIE</span>' : ''}
+        ${isMe ? '<span class="you-badge">YOU</span>' : ''}
+      </div>
+      <div class="lb-weekly"><div style="font-size:0.65rem">weekly £</div>${p.weekly}</div>
+      <div class="lb-points">${p.points}</div>
+    </div>`;
+  }).join('');
+}
+
+// ── Fixtures ──────────────────────────────────────────────────────────────────
+async function fetchFixtures() {
+  const apiUrl = 'https://api.football-data.org/v4/competitions/PL/matches?status=SCHEDULED';
+  const proxyUrl = 'https://corsproxy.io/?' + encodeURIComponent(apiUrl);
+  try {
+    const res = await fetch(proxyUrl, { headers: { 'X-Auth-Token': '06f21e4fcbf44c9984aa595874172fa2' } });
     if (!res.ok) throw new Error('API error');
     const data = await res.json();
     return data.matches || [];
-  } catch(e) {
-    return null; // signal failure
-  }
+  } catch(e) { return null; }
 }
 
 function getNextWeekendWindow() {
   const now = new Date();
-  const day = now.getDay(); // 0=Sun
-  // Find next Saturday
+  const day = now.getDay();
   const daysToSat = (6 - day + 7) % 7 || 7;
   const sat = new Date(now);
   sat.setDate(now.getDate() + daysToSat);
@@ -641,112 +696,129 @@ function getNextWeekendWindow() {
 
 function filterWeekendMatches(matches) {
   const { from, to } = getNextWeekendWindow();
-  return matches.filter(m => {
-    const d = new Date(m.utcDate);
-    return d >= from && d <= to;
-  });
+  return matches.filter(m => { const d = new Date(m.utcDate); return d >= from && d <= to; });
 }
 
 function formatMatchTime(utcDate) {
   const d = new Date(utcDate);
-  return d.toLocaleDateString('en-GB', { weekday:'short', day:'numeric', month:'short' }) +
-    ' · ' + d.toLocaleTimeString('en-GB', { hour:'2-digit', minute:'2-digit' });
+  return d.toLocaleDateString('en-GB',{weekday:'short',day:'numeric',month:'short'}) +
+    ' · ' + d.toLocaleTimeString('en-GB',{hour:'2-digit',minute:'2-digit'});
 }
 
-function getDeadline(matches) {
-  // First kick-off of the weekend
-  const times = matches.map(m => new Date(m.utcDate)).sort((a,b) => a-b);
-  return times[0];
+function estimateGWNumber(matches) {
+  if (!matches.length) return 27;
+  const d = new Date(matches[0].utcDate);
+  const seasonStart = new Date('2025-08-16');
+  return Math.max(27, Math.ceil((d - seasonStart) / (7*24*60*60*1000)));
 }
 
-// ── Predictions storage ───────────────────────────────────────────────────────
-function loadPreds(gw) {
-  try { return JSON.parse(localStorage.getItem(storeKey(gw)) || '{}'); }
-  catch { return {}; }
+// ── Supabase predictions ───────────────────────────────────────────────────────
+async function loadAllPredictions(gw) {
+  // Join predictions with profiles to get player names
+  const { data, error } = await sb
+    .from('predictions')
+    .select('match_key, home_score, away_score, profiles(player_name)')
+    .eq('gameweek', gw);
+
+  if (error) { console.error(error); return {}; }
+
+  const result = {};
+  data.forEach(row => {
+    const name = row.profiles?.player_name || 'Unknown';
+    if (!result[name]) result[name] = {};
+    result[name][row.match_key] = { home: row.home_score, away: row.away_score };
+  });
+  return result;
 }
 
-function savePreds(gw, data) {
-  localStorage.setItem(storeKey(gw), JSON.stringify(data));
+async function saveMyPredictions(gw, preds) {
+  const rows = Object.entries(preds).map(([match_key, scores]) => ({
+    user_id: currentUser.id,
+    gameweek: gw,
+    match_key,
+    home_score: scores.home !== undefined ? scores.home : null,
+    away_score: scores.away !== undefined ? scores.away : null,
+    updated_at: new Date().toISOString()
+  }));
+  const { error } = await sb.from('predictions').upsert(rows, { onConflict: 'user_id,gameweek,match_key' });
+  return !error;
 }
 
 // ── Render ────────────────────────────────────────────────────────────────────
-let currentGW = null;
-let currentMatches = [];
-let currentPlayer = PLAYERS[0];
-let predictions = {};
-
-function renderFixtures(matches, gwNumber) {
-  currentMatches = matches;
-  currentGW = gwNumber;
-  predictions = loadPreds(gwNumber);
-
-  const deadline = getDeadline(matches);
-  const now = new Date();
-  const deadlineOk = now < deadline;
-
+async function fetchAndRenderFixtures() {
   const section = document.getElementById('fixtures-section');
-  section.innerHTML = '';
-  section.classList.add('fade-in');
+  const allMatches = await fetchFixtures();
 
-  // GW header
-  const header = document.createElement('div');
-  header.className = 'gw-header';
-  header.innerHTML = `
-    <div>
-      <div class="gw-title">Gameweek ${gwNumber}</div>
-      <div class="gw-date">${matches.length} fixtures · ${matches.length > 0 ? new Date(matches[0].utcDate).toLocaleDateString('en-GB',{day:'numeric',month:'long',year:'numeric'}) : ''}</div>
-    </div>
-    <div>
-      <span class="deadline-pill ${deadlineOk ? 'ok' : ''}">
-        ${deadlineOk ? '✓ Open' : '✗ Closed'} · Deadline ${deadline.toLocaleDateString('en-GB',{weekday:'short',hour:'2-digit',minute:'2-digit'})}
+  if (!allMatches) {
+    section.innerHTML = `<div class="state-box fade-in">
+      <div class="no-gw-msg">⚠ Could not load fixtures</div>
+      <div style="font-size:0.8rem">Unable to reach the fixtures API. Please try refreshing.</div>
+    </div>`;
+    return;
+  }
+
+  const weekend = filterWeekendMatches(allMatches);
+  if (!weekend.length) {
+    section.innerHTML = `<div class="state-box fade-in">
+      <div class="no-gw-msg">No fixtures this weekend</div>
+      <div style="font-size:0.8rem">No Premier League games scheduled. Check back on Monday.</div>
+    </div>`;
+    return;
+  }
+
+  currentMatches = weekend;
+  currentGW = estimateGWNumber(weekend);
+
+  // Load all predictions with names
+  allPredictions = await loadAllPredictions(currentGW);
+  const myPreds = allPredictions[currentPlayerName] || {};
+
+  const deadline = weekend.map(m => new Date(m.utcDate)).sort((a,b)=>a-b)[0];
+  const isOpen = new Date() < deadline;
+
+  section.innerHTML = `
+    <div class="gw-header">
+      <div>
+        <div class="gw-title">Gameweek ${currentGW}</div>
+        <div class="gw-date">${weekend.length} fixtures · ${new Date(weekend[0].utcDate).toLocaleDateString('en-GB',{day:'numeric',month:'long',year:'numeric'})}</div>
+      </div>
+      <span class="deadline-pill ${isOpen?'ok':''}">
+        ${isOpen ? '✓ Open' : '✗ Closed'} · Deadline ${deadline.toLocaleDateString('en-GB',{weekday:'short'})} ${deadline.toLocaleTimeString('en-GB',{hour:'2-digit',minute:'2-digit'})}
       </span>
     </div>
+    <div class="section-label">Your predictions — ${currentPlayerName}</div>
+    <div class="fixture-list" id="fixture-list"></div>
+    ${isOpen
+      ? `<div class="save-bar">
+          <button class="btn-save" id="save-btn" onclick="savePredictions()">Save my predictions</button>
+          <span class="save-msg" id="save-msg">✓ Saved!</span>
+        </div>`
+      : `<div style="margin-top:1rem;font-size:0.78rem;color:var(--muted)">Predictions are locked — deadline has passed.</div>`
+    }
   `;
-  section.appendChild(header);
 
-  // Section label
-  const lbl = document.createElement('div');
-  lbl.className = 'section-label';
-  lbl.innerHTML = 'Enter your predictions';
-  section.appendChild(lbl);
+  section.classList.add('fade-in');
 
-  // Player selector
-  const sel = document.createElement('div');
-  sel.className = 'player-selector';
-  PLAYERS.forEach(p => {
-    const btn = document.createElement('button');
-    btn.className = 'player-btn' + (p === currentPlayer ? ' active' : '');
-    btn.textContent = p;
-    btn.onclick = () => {
-      currentPlayer = p;
-      document.querySelectorAll('.player-btn').forEach(b => b.classList.remove('active'));
-      btn.classList.add('active');
-      updateInputs();
-    };
-    sel.appendChild(btn);
-  });
-  section.appendChild(sel);
-
-  // Fixture list
-  const list = document.createElement('div');
-  list.className = 'fixture-list';
-  matches.forEach((m, i) => {
-    const card = document.createElement('div');
-    card.className = 'fixture-card';
+  const list = document.getElementById('fixture-list');
+  weekend.forEach((m, i) => {
     const home = m.homeTeam?.shortName || m.homeTeam?.name || 'Home';
     const away = m.awayTeam?.shortName || m.awayTeam?.name || 'Away';
     const key = `${i}_${home}_${away}`;
+    const eh = myPreds[key]?.home;
+    const ea = myPreds[key]?.away;
+    const card = document.createElement('div');
+    card.className = 'fixture-card';
     card.innerHTML = `
       <div class="fixture-team home">${home}</div>
       <div>
         <div class="score-inputs">
           <input class="score-input" type="number" min="0" max="20" placeholder="–"
-            data-match="${key}" data-side="home"
-            ${!deadlineOk ? 'disabled' : ''}>
+            data-key="${key}" data-side="home"
+            value="${eh !== undefined ? eh : ''}" ${!isOpen ? 'disabled' : ''}>
           <span class="score-sep">:</span>
           <input class="score-input" type="number" min="0" max="20" placeholder="–"
-            data-match="${key}" data-side="away"
-            ${!deadlineOk ? 'disabled' : ''}>
+            data-key="${key}" data-side="away"
+            value="${ea !== undefined ? ea : ''}" ${!isOpen ? 'disabled' : ''}>
         </div>
         <div class="fixture-time">${formatMatchTime(m.utcDate)}</div>
       </div>
@@ -754,153 +826,75 @@ function renderFixtures(matches, gwNumber) {
     `;
     list.appendChild(card);
   });
-  section.appendChild(list);
 
-  // Save bar
-  if (deadlineOk) {
-    const bar = document.createElement('div');
-    bar.className = 'save-bar';
-    bar.innerHTML = `
-      <button class="btn-save" onclick="saveCurrentPlayer()">Save ${currentPlayer.split(' ')[0]}'s predictions</button>
-      <button class="btn-clear" onclick="clearCurrentPlayer()">Clear</button>
-      <span class="save-msg" id="save-msg">✓ Saved!</span>
-    `;
-    section.appendChild(bar);
-  }
-
-  updateInputs();
-  renderSummary();
+  renderSummary(myPreds);
 }
 
-function updateInputs() {
-  const preds = predictions[currentPlayer] || {};
-  document.querySelectorAll('.score-input').forEach(inp => {
-    const key = inp.dataset.match;
-    const side = inp.dataset.side;
-    const val = preds[key]?.[side];
-    inp.value = val !== undefined ? val : '';
-  });
-
-  // Update save button label
-  const saveBtn = document.querySelector('.btn-save');
-  if (saveBtn) saveBtn.textContent = `Save ${currentPlayer.split(' ')[0]}'s predictions`;
-}
-
-function saveCurrentPlayer() {
+async function savePredictions() {
   const preds = {};
   document.querySelectorAll('.score-input').forEach(inp => {
-    const key = inp.dataset.match;
+    const key = inp.dataset.key;
     const side = inp.dataset.side;
     if (!preds[key]) preds[key] = {};
     if (inp.value !== '') preds[key][side] = parseInt(inp.value);
   });
-  if (!predictions[currentPlayer]) predictions[currentPlayer] = {};
-  predictions[currentPlayer] = preds;
-  savePreds(currentGW, predictions);
 
-  const msg = document.getElementById('save-msg');
-  if (msg) { msg.classList.add('show'); setTimeout(() => msg.classList.remove('show'), 2000); }
-  renderSummary();
+  const btn = document.getElementById('save-btn');
+  btn.disabled = true; btn.textContent = 'Saving…';
+  const ok = await saveMyPredictions(currentGW, preds);
+  btn.disabled = false; btn.textContent = 'Save my predictions';
+
+  if (ok) {
+    const msg = document.getElementById('save-msg');
+    msg.classList.add('show');
+    setTimeout(() => msg.classList.remove('show'), 2500);
+    allPredictions[currentPlayerName] = preds;
+    renderSummary(preds);
+  }
 }
 
-function clearCurrentPlayer() {
-  if (!confirm(`Clear ${currentPlayer}'s predictions?`)) return;
-  delete predictions[currentPlayer];
-  savePreds(currentGW, predictions);
-  updateInputs();
-  renderSummary();
-}
-
-function renderSummary() {
+function renderSummary(myPreds) {
   const section = document.getElementById('summary-section');
-  const thead = document.getElementById('pred-thead');
-  const tbody = document.getElementById('pred-tbody');
+  if (!currentMatches.length) { section.style.display = 'none'; return; }
+  section.style.display = '';
 
-  // Collect all match keys
   const allKeys = currentMatches.map((m, i) => {
     const home = m.homeTeam?.shortName || m.homeTeam?.name || 'Home';
     const away = m.awayTeam?.shortName || m.awayTeam?.name || 'Away';
-    return { key: `${i}_${home}_${away}`, home, away };
+    return { key: `${i}_${home}_${away}`, label: `${home} v ${away}` };
   });
 
-  if (allKeys.length === 0) { section.style.display = 'none'; return; }
-  section.style.display = '';
-
-  // Build header
-  thead.innerHTML = `<tr>
+  document.getElementById('pred-thead').innerHTML = `<tr>
     <th>Player</th>
-    ${allKeys.map(({home,away}) => `<th>${home} v ${away}</th>`).join('')}
+    ${allKeys.map(({label}) => `<th>${label}</th>`).join('')}
   </tr>`;
 
-  // Build rows
-  tbody.innerHTML = PLAYERS.map(player => {
-    const preds = predictions[player] || {};
-    const cells = allKeys.map(({key}) => {
-      const h = preds[key]?.home;
-      const a = preds[key]?.away;
-      const hasScore = h !== undefined && a !== undefined;
-      return `<td><span class="pred-chip ${hasScore ? '' : 'empty'}">${hasScore ? `${h} – ${a}` : '–'}</span></td>`;
-    }).join('');
-    return `<tr><td style="font-weight:500">${player}</td>${cells}</tr>`;
+  // Show all players in leaderboard order
+  const rows = PLAYERS.map(name => {
+    const preds = allPredictions[name] || {};
+    const isMe = name === currentPlayerName;
+    return `<tr ${isMe ? 'class="my-row"' : ''}>
+      <td style="font-weight:${isMe?'600':'500'}">${name}${isMe ? ' <span class="you-badge">YOU</span>' : ''}</td>
+      ${allKeys.map(({key}) => {
+        const h = preds[key]?.home;
+        const a = preds[key]?.away;
+        const has = h !== undefined && a !== undefined;
+        return `<td><span class="pred-chip ${has?'':'empty'}">${has ? `${h} – ${a}` : '–'}</span></td>`;
+      }).join('')}
+    </tr>`;
   }).join('');
-}
 
-function showNoGameweek() {
-  const section = document.getElementById('fixtures-section');
-  section.innerHTML = `
-    <div class="state-box fade-in">
-      <div class="no-gw-msg">No fixtures this weekend</div>
-      <div style="font-size:0.8rem">There are no Premier League games scheduled for the coming weekend. Check back on Monday for the next gameweek.</div>
-    </div>`;
-}
-
-function showError(matches) {
-  // CORS blocked — show manual fixture entry fallback
-  const section = document.getElementById('fixtures-section');
-  section.innerHTML = `
-    <div class="state-box fade-in" style="text-align:left;max-width:480px">
-      <div class="no-gw-msg" style="font-size:1.3rem;margin-bottom:0.5rem">⚠ Could not fetch live fixtures</div>
-      <div style="font-size:0.78rem;color:var(--muted);margin-bottom:1rem">
-        The fixture API is unavailable in this environment. To use this page properly, host it on a server or use a proxy.
-        In the meantime, here's what would appear when loaded correctly:
-      </div>
-      <div style="font-size:0.75rem;color:var(--muted)">
-        The page automatically detects the next weekend's PL fixtures, creates a Gameweek entry, 
-        lets each player input their score predictions, and saves them locally (per device/browser).
-        On Monday, no games = no gameweek is created.
-      </div>
-    </div>`;
-}
-
-// ── Derive a GW number from the fixture count seen so far ─────────────────────
-// Since we can't map to the exact GW number from the API easily without context,
-// we estimate based on stored data. GW26 was the last completed one.
-function estimateGWNumber(matches) {
-  // Use the match date to estimate; season started Aug 2025, GW1 = Aug 16
-  if (matches.length === 0) return 27;
-  const d = new Date(matches[0].utcDate);
-  const seasonStart = new Date('2025-08-16');
-  const weeksDiff = Math.ceil((d - seasonStart) / (7 * 24 * 60 * 60 * 1000));
-  return Math.max(27, weeksDiff); // at least GW27
+  document.getElementById('pred-tbody').innerHTML = rows;
 }
 
 // ── Boot ──────────────────────────────────────────────────────────────────────
-(async () => {
-  const allMatches = await fetchFixtures();
-  if (allMatches === null) {
-    showError();
-    return;
-  }
+sb.auth.getSession().then(({ data: { session } }) => {
+  if (session?.user) loadApp(session.user);
+});
 
-  const weekend = filterWeekendMatches(allMatches);
-  if (weekend.length === 0) {
-    showNoGameweek();
-    return;
-  }
-
-  const gw = estimateGWNumber(weekend);
-  renderFixtures(weekend, gw);
-})();
+sb.auth.onAuthStateChange((event, session) => {
+  if (event === 'SIGNED_IN' && session?.user) loadApp(session.user);
+});
 </script>
 </body>
 </html>
