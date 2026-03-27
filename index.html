@@ -457,6 +457,33 @@ function ukDateStr(utcDate) {
     .split('/').reverse().join('-');
 }
 
+function cleanTeamName(name) {
+  if (!name) return name;
+  const map = {
+    'Tottenham Hotspur FC': 'Spurs',
+    'Nottingham Forest FC': 'Nott'm Forest',
+    'Brighton & Hove Albion FC': 'Brighton',
+    'Manchester City FC': 'Man City',
+    'Manchester United FC': 'Man Utd',
+    'Newcastle United FC': 'Newcastle',
+    'West Ham United FC': 'West Ham',
+    'Wolverhampton Wanderers FC': 'Wolves',
+    'AFC Bournemouth': 'Bournemouth',
+    'Aston Villa FC': 'Aston Villa',
+    'Arsenal FC': 'Arsenal',
+    'Brentford FC': 'Brentford',
+    'Burnley FC': 'Burnley',
+    'Chelsea FC': 'Chelsea',
+    'Crystal Palace FC': 'Crystal Palace',
+    'Everton FC': 'Everton',
+    'Fulham FC': 'Fulham',
+    'Leeds United FC': 'Leeds',
+    'Liverpool FC': 'Liverpool',
+    'Sunderland AFC': 'Sunderland',
+  };
+  return map[name] || name.replace(' FC', '').replace(' AFC', '');
+}
+
 async function plFetch(url) {
   const proxyUrl = 'https://corsproxy.io/?' + encodeURIComponent(url);
   try {
@@ -576,8 +603,8 @@ async function syncResultsToSupabase(gw, liveMatches) {
   const finished = liveMatches.filter(m=>m.status==='FINISHED');
   if(!finished.length) return;
   const rows = finished.map((m,i)=>{
-    const home=m.homeTeam?.shortName||m.homeTeam?.name||'Home';
-    const away=m.awayTeam?.shortName||m.awayTeam?.name||'Away';
+    const home=cleanTeamName(m.homeTeam?.name)||'Home';
+    const away=cleanTeamName(m.awayTeam?.name)||'Away';
     return {
       gameweek: gw,
       match_key: `${i}_${home}_${away}`,
@@ -642,8 +669,8 @@ async function fetchAndRenderFixtures() {
 function buildLiveResults(liveMatches) {
   liveResults={};
   liveMatches.forEach((m,i)=>{
-    const home=m.homeTeam?.shortName||m.homeTeam?.name||'Home';
-    const away=m.awayTeam?.shortName||m.awayTeam?.name||'Away';
+    const home=cleanTeamName(m.homeTeam?.name)||'Home';
+    const away=cleanTeamName(m.awayTeam?.name)||'Away';
     const key=`${i}_${home}_${away}`;
     liveResults[key]={
       home: m.score?.fullTime?.home??m.score?.halfTime?.home??null,
@@ -651,6 +678,20 @@ function buildLiveResults(liveMatches) {
       status: m.status // SCHEDULED, IN_PLAY, PAUSED, FINISHED
     };
   });
+}
+
+function getGWDateLabel(matches) {
+  const seen = new Set();
+  const days = [];
+  matches.forEach(function(m) {
+    const key = new Date(m.utcDate).toLocaleDateString('en-GB', {timeZone:'Europe/London'});
+    if (!seen.has(key)) {
+      seen.add(key);
+      days.push(new Date(m.utcDate).toLocaleDateString('en-GB', {timeZone:'Europe/London', day:'numeric', month:'long'}));
+    }
+  });
+  const year = new Date(matches[0].utcDate).toLocaleDateString('en-GB', {timeZone:'Europe/London', year:'numeric'});
+  return matches.length + ' fixtures · ' + days.join(' / ') + ' ' + year;
 }
 
 function renderMatchesView(myPreds, deadline, liveMatches) {
@@ -666,8 +707,8 @@ function renderMatchesView(myPreds, deadline, liveMatches) {
   let totalPts=0, correctScores=0, correctResults=0;
   if(deadlinePassed){
     currentMatches.forEach((m,i)=>{
-      const home=m.homeTeam?.shortName||m.homeTeam?.name||'Home';
-      const away=m.awayTeam?.shortName||m.awayTeam?.name||'Away';
+      const home=cleanTeamName(m.homeTeam?.name)||'Home';
+      const away=cleanTeamName(m.awayTeam?.name)||'Away';
       const key=`${i}_${home}_${away}`;
       const pred=myPreds[key];
       const res=liveResults[key];
@@ -689,7 +730,7 @@ function renderMatchesView(myPreds, deadline, liveMatches) {
     <div class="gw-header">
       <div>
         <div class="gw-title">Gameweek ${currentGW}</div>
-        <div class="gw-date">${currentMatches.length} fixtures · ${new Date(currentMatches[0].utcDate).toLocaleDateString('en-GB',{day:'numeric',month:'long',year:'numeric'})}</div>
+        <div class="gw-date">${getGWDateLabel(weekend)}</div>
       </div>
       <span class="deadline-pill ${pillClass}">${pillText}</span>
     </div>
@@ -709,8 +750,8 @@ function renderMatchesView(myPreds, deadline, liveMatches) {
 
   const list=document.getElementById('fixture-list');
   currentMatches.forEach((m,i)=>{
-    const home=m.homeTeam?.shortName||m.homeTeam?.name||'Home';
-    const away=m.awayTeam?.shortName||m.awayTeam?.name||'Away';
+    const home=cleanTeamName(m.homeTeam?.name)||'Home';
+    const away=cleanTeamName(m.awayTeam?.name)||'Away';
     const key=`${i}_${home}_${away}`;
     const pred=myPreds[key];
     const res=liveResults[key];
@@ -783,8 +824,8 @@ function renderSummary(myPreds) {
   if (!currentMatches.length) { section.style.display = 'none'; return; }
 
   const allKeys = currentMatches.map((m, i) => {
-    const home = m.homeTeam?.shortName || m.homeTeam?.name || 'Home';
-    const away = m.awayTeam?.shortName || m.awayTeam?.name || 'Away';
+    const home = cleanTeamName(m.homeTeam?.name) || 'Home';
+    const away = cleanTeamName(m.awayTeam?.name) || 'Away';
     return { key: `${i}_${home}_${away}`, label: `${home} v ${away}` };
   });
 
