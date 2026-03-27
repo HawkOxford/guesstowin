@@ -491,15 +491,36 @@ function getNextWeekendWindow() {
 }
 
 function filterWeekendMatches(matches) {
-  // Find the next upcoming match from now
-  const now=new Date();
-  const upcoming=matches
-    .filter(m=>new Date(m.utcDate)>=now)
-    .sort((a,b)=>new Date(a.utcDate)-new Date(b.utcDate));
-  if(!upcoming.length) return [];
+  const now = new Date();
+  // Filter to future Sat/Sun matches only using UK local time
+  const weekendMatches = matches
+    .filter(m => {
+      const d = new Date(m.utcDate);
+      if (d <= now) return false;
+      const ukDay = d.toLocaleDateString('en-GB', {timeZone:'Europe/London', weekday:'long'});
+      return ukDay === 'Saturday' || ukDay === 'Sunday';
+    })
+    .sort((a, b) => new Date(a.utcDate) - new Date(b.utcDate));
 
-  // Anchor to the first upcoming match
-  const anchor=new Date(upcoming[0].utcDate);
+  if (!weekendMatches.length) return [];
+
+  // Find the Saturday of the first upcoming weekend
+  const firstMatch = new Date(weekendMatches[0].utcDate);
+  const firstUKDay = firstMatch.toLocaleDateString('en-GB', {timeZone:'Europe/London', weekday:'long'});
+  
+  // Roll back to Saturday if first match is Sunday
+  const saturdayStart = new Date(firstMatch);
+  if (firstUKDay === 'Sunday') saturdayStart.setDate(firstMatch.getDate() - 1);
+  saturdayStart.setHours(0, 0, 0, 0);
+  
+  // Window ends Sunday night (48 hours from Saturday midnight)
+  const sundayEnd = new Date(saturdayStart.getTime() + 2 * 24 * 60 * 60 * 1000);
+
+  return weekendMatches.filter(m => {
+    const d = new Date(m.utcDate);
+    return d >= saturdayStart && d <= sundayEnd;
+  });
+}
 
   // Find the Saturday of that round
   const dow=anchor.getDay(); // 0=Sun,1=Mon,6=Sat
@@ -594,9 +615,6 @@ async function fetchAndRenderFixtures() {
   }
 
   const weekend=filterWeekendMatches(allMatches);
-  console.log('All matches from API:', allMatches.length);
-  console.log('First 3 matches:', allMatches.slice(0,3).map(m=>({date:m.utcDate,home:m.homeTeam?.name,away:m.awayTeam?.name,status:m.status})));
-  console.log('Weekend matches found:', weekend.length);
   if(!weekend.length){
     section.innerHTML=`<div class="state-box fade-in"><div class="no-gw-msg">No fixtures this weekend</div><div style="font-size:0.8rem">No Premier League games scheduled. Check back on Monday.</div></div>`;
     return;
@@ -840,3 +858,4 @@ sb.auth.onAuthStateChange((event,session)=>{if(event==='SIGNED_IN'&&session?.use
 </script>
 </body>
 </html>
+
