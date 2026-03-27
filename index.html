@@ -513,10 +513,9 @@ function formatMatchTime(utcDate) {
 }
 
 function estimateGWNumber(matches) {
+  // Use the matchday field directly from the API
   if (!matches.length) return 27;
-  const d = new Date(matches[0].utcDate);
-  const seasonStart = new Date('2025-08-16');
-  return Math.max(27, Math.ceil((d - seasonStart) / (7*24*60*60*1000)));
+  return matches[0].matchday || 27;
 }
 
 // ── Supabase predictions ───────────────────────────────────────────────────────
@@ -824,5 +823,3 @@ sb.auth.onAuthStateChange((event,session)=>{if(event==='SIGNED_IN'&&session?.use
 </script>
 </body>
 </html>
-
-
