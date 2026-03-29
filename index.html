@@ -731,7 +731,7 @@ function renderMatchesView(myPreds, deadline, liveMatches, weekend) {
   section.classList.add('fade-in');
 
   const pillClass=isOpen?'ok':hasLive?'live':'';
-  const pillText=isOpen?'✓ Open · Deadline '+deadline.toLocaleDateString('en-GB',{weekday:'short'})+' '+deadline.toLocaleTimeString('en-GB',{hour:'2-digit',minute:'2-digit'}):hasLive?'● Live now':'✗ Closed';
+  const pillText=isOpen?'✓ Open · Deadline '+deadline.toLocaleDateString('en-GB',{timeZone:'Europe/London',weekday:'short',day:'numeric',month:'short'})+' · '+deadline.toLocaleTimeString('en-GB',{timeZone:'Europe/London',hour:'2-digit',minute:'2-digit'}):hasLive?'● Live now':'✗ Closed';
 
   section.innerHTML=`
     <div class="gw-header">
