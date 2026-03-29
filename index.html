@@ -104,11 +104,12 @@
   .fixture-card.wrong { border-color: rgba(239,83,80,0.3); }
   .fixture-card.live-now { border-color: var(--amber); }
 
-  .fixture-team { font-weight: 500; font-size: 0.88rem; line-height: 1.2; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-  .fixture-team.home { text-align: right; }
-  .fixture-team.away { text-align: left; }
-  .team-crest { width: 22px; height: 22px; object-fit: contain; display: block; }
+  .fixture-team { font-weight: 500; font-size: 0.88rem; line-height: 1.2; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; display: flex; align-items: center; height: 100%; }
+  .fixture-team.home { justify-content: flex-end; }
+  .fixture-team.away { justify-content: flex-start; }
+  .team-crest { width: 22px; height: 22px; object-fit: contain; display: flex; align-self: center; }
   .fixture-centre { text-align: center; }
+  .fixture-card > div { display: flex; align-items: center; justify-content: center; }
   .live-score { display: flex; align-items: center; gap: 0.3rem; justify-content: center; }
   .fixture-card { background: var(--card); border: 1px solid var(--border); border-radius: 8px; padding: 0.85rem 0.75rem; display: grid; grid-template-columns: minmax(0,1fr) 28px auto 28px minmax(0,1fr); align-items: center; gap: 0.35rem; transition: border-color 0.2s; }
   .fixture-time { font-size: 0.65rem; color: var(--muted); text-align: center; margin-top: 2px; }
