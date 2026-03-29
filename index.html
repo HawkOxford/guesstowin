@@ -694,7 +694,7 @@ function getGWDateLabel(matches) {
     const key = new Date(m.utcDate).toLocaleDateString('en-GB', {timeZone:'Europe/London'});
     if (!seen.has(key)) {
       seen.add(key);
-      days.push(new Date(m.utcDate).toLocaleDateString('en-GB', {timeZone:'Europe/London', weekday:'long'}));
+      days.push(new Date(m.utcDate).toLocaleDateString('en-GB', {timeZone:'Europe/London', weekday:'long', day:'numeric', month:'long'}));
     }
   });
   const year = new Date(matches[0].utcDate).toLocaleDateString('en-GB', {timeZone:'Europe/London', year:'numeric'});
