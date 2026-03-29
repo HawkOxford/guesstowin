@@ -553,9 +553,7 @@ function filterWeekendMatches(matches) {
 }
 
 function formatMatchTime(utcDate) {
-  const d = new Date(utcDate);
-  return d.toLocaleDateString('en-GB', {timeZone:'Europe/London', weekday:'short', day:'numeric', month:'short'}) +
-    ' · ' + d.toLocaleTimeString('en-GB', {timeZone:'Europe/London', hour:'2-digit', minute:'2-digit'});
+  return new Date(utcDate).toLocaleTimeString('en-GB', {timeZone:'Europe/London', hour:'2-digit', minute:'2-digit'});
 }
 
 async function estimateGWNumber(matches) {
