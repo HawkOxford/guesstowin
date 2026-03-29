@@ -95,8 +95,8 @@
   .deadline-pill.ok { background: rgba(0,230,118,0.08); border-color: rgba(0,230,118,0.2); color: var(--green); }
   .deadline-pill.live { background: rgba(255,167,38,0.1); border-color: rgba(255,167,38,0.3); color: var(--amber); }
   .fixture-list { display: flex; flex-direction: column; gap: 0.6rem; }
-  .day-header { font-size: 0.68rem; font-weight: 700; letter-spacing: 0.12em; text-transform: uppercase; color: var(--muted); padding: 0.5rem 0 0.2rem; border-top: 1px solid var(--border); margin-top: 0.4rem; }
-  .day-header:first-child { border-top: none; margin-top: 0; }
+  .day-header { font-size: 0.68rem; font-weight: 700; letter-spacing: 0.15em; text-transform: uppercase; color: var(--muted); padding: 0.6rem 0 0.2rem; border-top: 1px solid var(--border); margin-top: 0.4rem; text-align: center; }
+  .day-header:first-child { border-top: none; margin-top: 0; padding-top: 0; }
 
   .fixture-card { background: var(--card); border: 1px solid var(--border); border-radius: 8px; padding: 0.85rem 0.75rem; display: flex; flex-direction: column; gap: 0.4rem; transition: border-color 0.2s; }
   .fixture-main { display: grid; grid-template-columns: minmax(0,1fr) 28px auto 28px minmax(0,1fr); align-items: center; gap: 0.35rem; }
@@ -694,7 +694,7 @@ function getGWDateLabel(matches) {
     const key = new Date(m.utcDate).toLocaleDateString('en-GB', {timeZone:'Europe/London'});
     if (!seen.has(key)) {
       seen.add(key);
-      days.push(new Date(m.utcDate).toLocaleDateString('en-GB', {timeZone:'Europe/London', day:'numeric', month:'long'}));
+      days.push(new Date(m.utcDate).toLocaleDateString('en-GB', {timeZone:'Europe/London', weekday:'long'}));
     }
   });
   const year = new Date(matches[0].utcDate).toLocaleDateString('en-GB', {timeZone:'Europe/London', year:'numeric'});
