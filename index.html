@@ -591,7 +591,9 @@ async function loadAllPredictions(gw) {
   (preds||[]).forEach(row=>{
     const name=nameMap[row.user_id]||'Unknown';
     if(!result[name])result[name]={};
-    result[name][row.match_key]={home:row.home_score,away:row.away_score};
+    // Support both old key format (0_Home_Away) and new (Home_Away)
+    const key=row.match_key.replace(/^\d+_/,'');
+    result[name][key]={home:row.home_score,away:row.away_score};
   });
   return result;
 }
@@ -616,7 +618,7 @@ async function syncResultsToSupabase(gw, liveMatches) {
     const away=cleanTeamName(m.awayTeam?.name)||'Away';
     return {
       gameweek: gw,
-      match_key: `${i}_${home}_${away}`,
+      match_key: `${home}_${away}`,
       home_score: m.score?.fullTime?.home,
       away_score: m.score?.fullTime?.away,
       status: 'finished'
@@ -680,7 +682,7 @@ function buildLiveResults(liveMatches) {
   liveMatches.forEach((m,i)=>{
     const home=cleanTeamName(m.homeTeam?.name)||'Home';
     const away=cleanTeamName(m.awayTeam?.name)||'Away';
-    const key=`${i}_${home}_${away}`;
+    const key=`${home}_${away}`;
     liveResults[key]={
       home: m.score?.fullTime?.home??m.score?.halfTime?.home??null,
       away: m.score?.fullTime?.away??m.score?.halfTime?.away??null,
@@ -718,7 +720,7 @@ function renderMatchesView(myPreds, deadline, liveMatches, weekend) {
     currentMatches.forEach((m,i)=>{
       const home=cleanTeamName(m.homeTeam?.name)||'Home';
       const away=cleanTeamName(m.awayTeam?.name)||'Away';
-      const key=`${i}_${home}_${away}`;
+      const key=`${home}_${away}`;
       const pred=myPreds[key];
       const res=liveResults[key];
       if(pred&&res&&res.home!==null){
@@ -761,7 +763,7 @@ function renderMatchesView(myPreds, deadline, liveMatches, weekend) {
   currentMatches.forEach((m,i)=>{
     const home=cleanTeamName(m.homeTeam?.name)||'Home';
     const away=cleanTeamName(m.awayTeam?.name)||'Away';
-    const key=`${i}_${home}_${away}`;
+    const key=`${home}_${away}`;
     const pred=myPreds[key];
     const res=liveResults[key];
     const pts=res&&pred?calcPoints(pred.home,pred.away,res.home,res.away):null;
@@ -845,7 +847,7 @@ function renderSummary(myPreds) {
   const allKeys = currentMatches.map((m, i) => {
     const home = cleanTeamName(m.homeTeam?.name) || 'Home';
     const away = cleanTeamName(m.awayTeam?.name) || 'Away';
-    return { key: `${i}_${home}_${away}`, label: `${home} v ${away}` };
+    return { key: `${home}_${away}`, label: `${home} v ${away}` };
   });
 
   // Before deadline: show hidden notice (always rebuild innerHTML cleanly)
