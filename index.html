@@ -89,7 +89,7 @@
   .you-badge { font-size: 0.58rem; background: rgba(255,213,79,0.15); color: var(--gold); border-radius: 3px; padding: 1px 4px; font-weight: 700; letter-spacing: 0.05em; margin-left: 4px; }
 
   /* Fixtures */
-  .gw-header { display: flex; align-items: baseline; justify-content: space-between; margin-bottom: 1rem; flex-wrap: wrap; gap: 0.5rem; }
+  .gw-header { display: flex; align-items: flex-start; justify-content: space-between; margin-bottom: 1rem; flex-wrap: wrap; gap: 0.5rem; overflow: hidden; }
   .gw-title { font-family: 'Bebas Neue', sans-serif; font-size: 2rem; line-height: 1; }
   .gw-date { font-size: 0.75rem; color: var(--muted); }
   .deadline-pill { font-size: 0.65rem; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; background: rgba(239,83,80,0.1); border: 1px solid rgba(239,83,80,0.3); color: var(--red); border-radius: 20px; padding: 0.25rem 0.7rem; }
@@ -754,12 +754,9 @@ function renderMatchesView(myPreds, deadline, liveMatches, weekend) {
         <div class="gw-title">Gameweek ${currentGW}</div>
         <div class="gw-date">${getGWDateLabel(weekend)}</div>
       </div>
-      <div style="display:flex;flex-direction:column;align-items:flex-end;gap:0.4rem">
-        <div style="display:flex;flex-direction:column;align-items:flex-end;gap:0.35rem">
+      <div style="display:flex;flex-direction:column;align-items:flex-end;gap:0.35rem;min-width:0;max-width:280px">
         <span class="deadline-pill ${pillClass}">${pillText}</span>
-        ${!deadlinePassed ? '<div id="countdown-timer" class="deadline-pill countdown-pill">⏱ calculating…</div>' : ''}
-      </div>
-        ${!deadlinePassed ? '<div id="countdown-timer" class="countdown-pill"></div>' : ''}
+        ${!deadlinePassed ? '<div id="countdown-timer" class="countdown-pill">⏱ calculating…</div>' : ''}
       </div>
     </div>
     ${deadlinePassed ? `<div class="pts-summary">
