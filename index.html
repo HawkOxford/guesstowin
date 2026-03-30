@@ -138,11 +138,7 @@
   .pts-stat-label { font-size: 0.65rem; color: var(--muted); letter-spacing: 0.08em; text-transform: uppercase; margin-top: 2px; }
 
   .save-bar { margin-top: 1.5rem; display: flex; align-items: center; gap: 1rem; flex-wrap: wrap; }
-  .countdown { display: inline-flex; align-items: center; gap: 0.5rem; background: var(--bg3); border: 1px solid var(--border); border-radius: 8px; padding: 0.5rem 0.9rem; margin-bottom: 1rem; }
-  .countdown-unit { text-align: center; }
-  .countdown-num { font-family: 'Bebas Neue', sans-serif; font-size: 1.4rem; color: var(--green); line-height: 1; }
-  .countdown-label { font-size: 0.55rem; color: var(--muted); letter-spacing: 0.1em; text-transform: uppercase; }
-  .countdown-sep { font-family: 'Bebas Neue', sans-serif; font-size: 1.4rem; color: var(--border); align-self: flex-start; margin-top: 2px; }
+  .countdown-pill { font-size: 0.65rem; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; background: var(--green); color: #031a03; border-radius: 20px; padding: 0.25rem 0.7rem; text-align:center; }
   .btn-save { background: var(--green); color: #031a03; border: none; border-radius: 7px; padding: 0.75rem 2rem; font-family: 'DM Sans', sans-serif; font-weight: 700; font-size: 0.9rem; cursor: pointer; transition: all 0.15s; }
   .btn-save:hover { background: #00ff88; transform: translateY(-1px); }
   .btn-save:disabled { opacity: 0.5; cursor: not-allowed; transform: none; }
@@ -758,7 +754,13 @@ function renderMatchesView(myPreds, deadline, liveMatches, weekend) {
         <div class="gw-title">Gameweek ${currentGW}</div>
         <div class="gw-date">${getGWDateLabel(weekend)}</div>
       </div>
-      <span class="deadline-pill ${pillClass}">${pillText}</span>
+      <div style="display:flex;flex-direction:column;align-items:flex-end;gap:0.4rem">
+        <div style="display:flex;flex-direction:column;align-items:flex-end;gap:0.35rem">
+        <span class="deadline-pill ${pillClass}">${pillText}</span>
+        ${!deadlinePassed ? '<div id="countdown-timer" class="deadline-pill countdown-pill">⏱ calculating…</div>' : ''}
+      </div>
+        ${!deadlinePassed ? '<div id="countdown-timer" class="countdown-pill"></div>' : ''}
+      </div>
     </div>
     ${deadlinePassed ? `<div class="pts-summary">
       <div class="pts-stat"><div class="pts-stat-num">${totalPts}</div><div class="pts-stat-label">Points this GW</div></div>
@@ -766,7 +768,6 @@ function renderMatchesView(myPreds, deadline, liveMatches, weekend) {
       <div class="pts-stat"><div class="pts-stat-num" style="color:var(--amber)">${correctResults}</div><div class="pts-stat-label">Correct results</div></div>
     </div>` : ''}
     <div class="section-label">${deadlinePassed ? 'Results & your predictions' : 'Your predictions — '+currentPlayerName}</div>
-    ${!deadlinePassed ? '<div id="countdown-timer" class="countdown"></div>' : ''}
     <div class="fixture-list" id="fixture-list"></div>
     ${(isOpen || (!hasAnyPreds && deadlinePassed)) ? `<div class="save-bar">
       <button class="btn-save" id="save-btn" onclick="savePredictions()">Save my predictions</button>
@@ -950,22 +951,19 @@ function startCountdown(deadline) {
     const diff = deadline - now;
     if (diff <= 0) {
       clearInterval(countdownTimer);
-      el.innerHTML = '<span style="font-size:0.8rem;color:var(--amber)">Deadline passed</span>';
+      if (el) el.style.display = 'none';
       return;
     }
     const days = Math.floor(diff / (1000*60*60*24));
     const hours = Math.floor((diff % (1000*60*60*24)) / (1000*60*60));
     const mins = Math.floor((diff % (1000*60*60)) / (1000*60));
     const secs = Math.floor((diff % (1000*60)) / 1000);
-    el.innerHTML = `
-      <div class="countdown-unit"><div class="countdown-num">${String(days).padStart(2,'0')}</div><div class="countdown-label">Days</div></div>
-      <div class="countdown-sep">:</div>
-      <div class="countdown-unit"><div class="countdown-num">${String(hours).padStart(2,'0')}</div><div class="countdown-label">Hrs</div></div>
-      <div class="countdown-sep">:</div>
-      <div class="countdown-unit"><div class="countdown-num">${String(mins).padStart(2,'0')}</div><div class="countdown-label">Min</div></div>
-      <div class="countdown-sep">:</div>
-      <div class="countdown-unit"><div class="countdown-num">${String(secs).padStart(2,'0')}</div><div class="countdown-label">Sec</div></div>
-    `;
+    const parts = [];
+    if (days > 0) parts.push(days + 'd');
+    parts.push(String(hours).padStart(2,'0') + 'h');
+    parts.push(String(mins).padStart(2,'0') + 'm');
+    parts.push(String(secs).padStart(2,'0') + 's');
+    if (el) el.textContent = '⏱ ' + parts.join(' ') + ' to deadline';
   }
   update();
   countdownTimer = setInterval(update, 1000);
