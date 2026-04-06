@@ -177,6 +177,14 @@
   .fade-in { animation: fadeIn 0.4s ease both; }
   @keyframes fadeIn { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: translateY(0); } }
 
+  .gw-nav { display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem; }
+  .gw-nav-btn { background: var(--bg3); border: 1px solid var(--border); border-radius: 6px; padding: 0.3rem 0.9rem; font-family: 'DM Sans', sans-serif; font-size: 0.75rem; color: var(--muted); cursor: pointer; transition: all 0.15s; }
+  .gw-nav-btn:hover { border-color: var(--green); color: var(--green); }
+  .gw-nav-btn:disabled { opacity: 0.25; cursor: not-allowed; pointer-events: none; }
+  .winner-banner { display: flex; align-items: center; gap: 0.8rem; background: rgba(255,213,79,0.06); border: 1px solid rgba(255,213,79,0.2); border-radius: 8px; padding: 0.75rem 1rem; margin-bottom: 1rem; }
+  .winner-banner-text { font-size: 0.85rem; color: var(--gold); font-weight: 500; }
+  .winner-banner-sub { font-size: 0.7rem; color: var(--muted); margin-top: 2px; }
+
   @media (max-width: 600px) {
     header, .main { padding: 1rem; }
     .champion-badge { display: none; }
@@ -294,6 +302,7 @@ const BASE_WEEKLY_PRIZE = {
 let currentUser = null;
 let currentPlayerName = '';
 let currentGW = null;
+let viewingGW = null; // which GW the user is currently browsing
 let currentMatches = [];
 let allPredictions = {};
 let liveResults = {};
@@ -351,6 +360,7 @@ async function loadApp(user) {
   document.getElementById('auth-screen').style.display='none';
   document.getElementById('app-screen').style.display='block';
   document.getElementById('user-name-display').textContent=currentPlayerName;
+  viewingGW = null; // reset on login
   fetchAndRenderFixtures();
   renderLeaderboard();
 }
@@ -378,11 +388,11 @@ function calcPoints(predH, predA, actH, actA) {
 async function renderLeaderboard() {
   const section = document.getElementById('leaderboard-section');
 
-  // Load all completed results from Supabase
-  const {data: results} = await sb.from('results').select('*').eq('status','finished');
-  const [{data: allPreds},{data: allProfiles}] = await Promise.all([
-    sb.from('predictions').select('user_id, gameweek, match_key, home_score, away_score'),
-    sb.from('profiles').select('id, player_name')
+  // Load all data in parallel
+  const [{data: results},{data: allPreds},{data: allProfiles}] = await Promise.all([
+    sb.from('results').select('gameweek,match_key,home_score,away_score,status').eq('status','finished'),
+    sb.from('predictions').select('user_id,gameweek,match_key,home_score,away_score'),
+    sb.from('profiles').select('id,player_name')
   ]);
   const profileMap={};
   (allProfiles||[]).forEach(p=>{ profileMap[p.id]=p.player_name; });
@@ -560,11 +570,21 @@ async function fetchFixtures() {
 }
 
 async function fetchLiveMatches() {
-  // Use the dates of the current gameweek's matches to build the date range
-  if (!currentMatches.length) return [];
-  const dates = currentMatches.map(m => ukDateStr(m.utcDate)).sort();
+  // Build date range from currentMatches, or fall back to today+tomorrow
+  let dateFrom, dateTo;
+  if (currentMatches.length) {
+    const dates = currentMatches.map(m => ukDateStr(m.utcDate)).sort();
+    dateFrom = dates[0];
+    dateTo = dates[dates.length-1];
+  } else {
+    // Fallback: fetch today and tomorrow
+    const today = ukDateStr(new Date().toISOString());
+    const tomorrow = ukDateStr(new Date(Date.now()+86400000).toISOString());
+    dateFrom = today;
+    dateTo = tomorrow;
+  }
   const data = await plFetch(
-    `https://api.football-data.org/v4/competitions/PL/matches?dateFrom=${dates[0]}&dateTo=${dates[dates.length-1]}`
+    `https://api.football-data.org/v4/competitions/PL/matches?dateFrom=${dateFrom}&dateTo=${dateTo}`
   );
   return data ? data.matches : [];
 }
@@ -677,69 +697,400 @@ async function syncResultsToSupabase(gw, liveMatches) {
 }
 
 // ── Main render ───────────────────────────────────────────────────────────────
-async function fetchAndRenderFixtures() {
-  const section=document.getElementById('fixtures-section');
-  const allMatches=await fetchFixtures();
+async function fetchAndRenderFixtures(targetGW) {
+  const section = document.getElementById('fixtures-section');
 
-  if(!allMatches){
-    section.innerHTML=`<div class="state-box fade-in"><div class="no-gw-msg">⚠ Could not load fixtures</div><div style="font-size:0.8rem">Unable to reach the fixtures API. Please try refreshing.</div></div>`;
+  // Step 1: get upcoming fixtures
+  const allMatches = await fetchFixtures();
+  let weekend = allMatches ? filterWeekendMatches(allMatches) : [];
+
+  // Step 2: fallback to live matches if no upcoming found
+  if (!weekend.length) {
+    currentGW = await estimateGWNumber([]);
+    const live = await fetchLiveMatches();
+    if (live && live.length) {
+      weekend = live.filter(m => ['Saturday','Sunday'].includes(ukWeekday(m.utcDate)));
+      if (!weekend.length) weekend = live;
+    }
+  }
+
+  if (!weekend.length) {
+    section.innerHTML = `<div class="state-box fade-in"><div class="no-gw-msg">No fixtures this weekend</div><div style="font-size:0.8rem">No Premier League games scheduled. Check back later.</div></div>`;
     return;
   }
 
-  const weekend=filterWeekendMatches(allMatches);
-  if(!weekend.length){
-    section.innerHTML=`<div class="state-box fade-in"><div class="no-gw-msg">No fixtures this weekend</div><div style="font-size:0.8rem">No Premier League games scheduled. Check back on Monday.</div></div>`;
-    return;
+  // Step 3: set currentMatches ONCE
+  if (!currentMatches.length) {
+    currentMatches = weekend;
+    currentGW = await estimateGWNumber(weekend);
   }
 
-  currentMatches=weekend;
-  currentGW=await estimateGWNumber(weekend);
+  // If no targetGW specified, show current GW
+  if (!viewingGW) viewingGW = currentGW;
 
-  // Load predictions
-  allPredictions=await loadAllPredictions(currentGW);
-  const myPreds=allPredictions[currentPlayerName]||{};
+  // If viewing current GW
+  if (viewingGW === currentGW) {
+    allPredictions = await loadAllPredictions(currentGW);
+    const myPreds = allPredictions[currentPlayerName] || {};
+    const deadline = currentMatches.map(m=>new Date(m.utcDate)).sort((a,b)=>a-b)[0];
+    const now = new Date();
+    deadlinePassed = now >= deadline;
 
-  const deadline=weekend.map(m=>new Date(m.utcDate)).sort((a,b)=>a-b)[0];
-  const now=new Date();
-  deadlinePassed=now>=deadline;
+    let liveMatches = [];
+    if (deadlinePassed) {
+      liveMatches = await fetchLiveMatches();
+      await syncResultsToSupabase(currentGW, liveMatches);
+      buildLiveResults(liveMatches);
+    }
 
-  // Fetch live scores if deadline passed
-  let liveMatches=[];
-  if(deadlinePassed){
-    liveMatches=await fetchLiveMatches();
-    await syncResultsToSupabase(currentGW, liveMatches);
-    buildLiveResults(liveMatches);
-  }
+    renderMatchesView(myPreds, deadline, liveMatches, currentMatches);
+    if (!deadlinePassed) startCountdown(deadline);
+    else if (countdownTimer) { clearInterval(countdownTimer); countdownTimer = null; }
 
-  renderMatchesView(myPreds, deadline, liveMatches, weekend);
-  if (!deadlinePassed) startCountdown(deadline);
-  else if (countdownTimer) { clearInterval(countdownTimer); countdownTimer = null; }
-
-  // Auto-refresh every 60s during live weekend
-  if(refreshTimer) clearInterval(refreshTimer);
-  if(deadlinePassed){
-    refreshTimer=setInterval(async()=>{
-      const live=await fetchLiveMatches();
-      await syncResultsToSupabase(currentGW, live);
-      buildLiveResults(live);
-      const updatedPreds=allPredictions[currentPlayerName]||{};
-      renderMatchesView(updatedPreds, deadline, live, weekend);
-    }, 60000);
+    if (refreshTimer) clearInterval(refreshTimer);
+    if (deadlinePassed) {
+      refreshTimer = setInterval(async () => {
+        const live = await fetchLiveMatches();
+        await syncResultsToSupabase(currentGW, live);
+        buildLiveResults(live);
+        renderMatchesView(allPredictions[currentPlayerName]||{}, deadline, live, currentMatches);
+      }, 60000);
+    }
+  } else {
+    // Viewing a past or future GW
+    if (refreshTimer) clearInterval(refreshTimer);
+    if (countdownTimer) { clearInterval(countdownTimer); countdownTimer = null; }
+    await renderGWView(viewingGW);
   }
 }
 
 function buildLiveResults(liveMatches) {
   liveResults={};
-  liveMatches.forEach((m,i)=>{
+  liveMatches.forEach(m=>{
     const home=cleanTeamName(m.homeTeam?.name)||'Home';
     const away=cleanTeamName(m.awayTeam?.name)||'Away';
     const key=`${home}_${away}`;
     liveResults[key]={
-      home: m.score?.fullTime?.home??m.score?.halfTime?.home??null,
-      away: m.score?.fullTime?.away??m.score?.halfTime?.away??null,
-      status: m.status // SCHEDULED, IN_PLAY, PAUSED, FINISHED
+      home: m.score?.fullTime?.home??null,
+      away: m.score?.fullTime?.away??null,
+      status: m.status
     };
   });
+}
+
+// ── GW Navigation ────────────────────────────────────────────────────────────
+
+function gwNavButtons(gw) {
+  // Check if previous GW has results in Supabase
+  const prevGW = gw - 1;
+  const nextGW = gw + 1;
+  const now = new Date();
+
+  // Next GW available after Sunday midnight of current GW weekend
+  // Use Sunday 23:59 of current weekend as the gate
+  const nextGWAvailable = (() => {
+    if (!currentMatches.length) return false;
+    const dates = currentMatches.map(m => ukDateStr(m.utcDate)).sort();
+    const lastDate = dates[dates.length - 1];
+    const [y, mo, d] = lastDate.split('-').map(Number);
+    const sundayMidnight = new Date(y, mo - 1, d, 23, 59, 0);
+    return now >= sundayMidnight;
+  })();
+
+  return `
+    <button class="gw-nav-btn" ${prevGW < 27 ? 'disabled' : ''} onclick="navigateGW(${prevGW})">← GW${prevGW}</button>
+    <button class="gw-nav-btn" ${!nextGWAvailable ? 'disabled' : ''} onclick="navigateGW(${nextGW})">GW${nextGW} →</button>
+  `;
+}
+
+async function navigateGW(gw) {
+  viewingGW = gw;
+  if (gw === currentGW) {
+    await fetchAndRenderFixtures();
+  } else {
+    await renderGWView(gw);
+  }
+}
+
+async function renderGWView(gw) {
+  const section = document.getElementById('fixtures-section');
+  section.innerHTML = `<div class="state-box"><div class="spinner"></div><div>Loading GW${gw}…</div></div>`;
+
+  const isNextGW = gw > currentGW;
+
+  if (isNextGW) {
+    // Show next GW predictions view
+    const allMatches = await fetchFixtures();
+    const nextWeekend = allMatches ? getNextWeekendAfterCurrent(allMatches) : [];
+
+    if (!nextWeekend.length) {
+      section.innerHTML = `<div class="state-box fade-in"><div class="no-gw-msg">GW${gw} fixtures not available yet</div><div style="font-size:0.8rem">Check back closer to the weekend.</div></div>`;
+      return;
+    }
+
+    const deadline = nextWeekend.map(m => new Date(m.utcDate)).sort((a,b) => a-b)[0];
+    const preds = await loadAllPredictions(gw);
+    const myPreds = preds[currentPlayerName] || {};
+    allPredictions = preds;
+
+    section.innerHTML = '';
+    const pillText = '✓ Open · Deadline ' + deadline.toLocaleDateString('en-GB',{timeZone:'Europe/London',weekday:'short',day:'numeric',month:'short'}) + ' · ' + deadline.toLocaleTimeString('en-GB',{timeZone:'Europe/London',hour:'2-digit',minute:'2-digit'});
+
+    section.innerHTML = `
+      <div class="gw-nav">${gwNavButtons(gw)}</div>
+      <div class="gw-header">
+        <div>
+          <div class="gw-title">Gameweek ${gw}</div>
+          <div class="gw-date">${getGWDateLabel(nextWeekend)}</div>
+        </div>
+        <div style="display:flex;flex-direction:column;align-items:flex-end;gap:0.35rem;max-width:280px">
+          <span class="deadline-pill ok">${pillText}</span>
+          <div id="countdown-timer" class="countdown-pill">⏱ calculating…</div>
+        </div>
+      </div>
+      ${Object.keys(myPreds).length ? '<div class="nudge-banner nudge-ok"><span class="nudge-icon">✓</span><span>Predictions submitted — you can still edit until the deadline</span></div>' : '<div class="nudge-banner"><span class="nudge-icon">⚠</span><span>You haven&#39;t submitted your predictions yet</span></div>'}
+      <div class="section-label">Your predictions — ${currentPlayerName}</div>
+      <div class="fixture-list" id="fixture-list"></div>
+      <div class="save-bar">
+        <button class="btn-save" id="save-btn" onclick="savePredictionsForGW(${gw})">Save my predictions</button>
+        <span class="save-msg" id="save-msg">✓ Saved!</span>
+      </div>`;
+
+    startCountdown(deadline);
+
+    const list = document.getElementById('fixture-list');
+    let lastDay = null;
+    nextWeekend.forEach(m => {
+      const matchDay = new Date(m.utcDate).toLocaleDateString('en-GB',{timeZone:'Europe/London',weekday:'long',day:'numeric',month:'long'});
+      const dayKey = new Date(m.utcDate).toLocaleDateString('en-GB',{timeZone:'Europe/London'});
+      if (dayKey !== lastDay) {
+        lastDay = dayKey;
+        const dh = document.createElement('div');
+        dh.className = 'day-header';
+        dh.textContent = matchDay;
+        list.appendChild(dh);
+      }
+      const home = cleanTeamName(m.homeTeam?.name) || 'Home';
+      const away = cleanTeamName(m.awayTeam?.name) || 'Away';
+      const key = `${home}_${away}`;
+      const pred = myPreds[key];
+      const hCrest = m.homeTeam?.crest ? `<img class="team-crest" src="${m.homeTeam.crest}" alt="" onerror="this.style.display='none'">` : '';
+      const aCrest = m.awayTeam?.crest ? `<img class="team-crest" src="${m.awayTeam.crest}" alt="" onerror="this.style.display='none'">` : '';
+      const scoreRow = `<div class="score-inputs">
+        <input class="score-input" type="number" min="0" max="20" placeholder="–" data-key="${key}" data-side="home" value="${pred?.home!==undefined?pred.home:''}">
+        <span class="score-sep">:</span>
+        <input class="score-input" type="number" min="0" max="20" placeholder="–" data-key="${key}" data-side="away" value="${pred?.away!==undefined?pred.away:''}">
+      </div>`;
+      const card = document.createElement('div');
+      card.className = 'fixture-card';
+      const subRowNext = `<div class="fixture-sub">${formatMatchTime(m.utcDate)}</div>`;
+      card.innerHTML = `<div class="fixture-main"><div class="fixture-team home">${home}</div><div class="fixture-crest">${hCrest}</div>${scoreRow}<div class="fixture-crest">${aCrest}</div><div class="fixture-team away">${away}</div></div>${subRowNext}`;
+      list.appendChild(card);
+    });
+    return;
+  }
+
+  // Past GW review
+  const [{data:results},{data:preds},{data:profiles}] = await Promise.all([
+    sb.from('results').select('*').eq('gameweek', gw),
+    sb.from('predictions').select('user_id,match_key,home_score,away_score').eq('gameweek', gw),
+    sb.from('profiles').select('id,player_name')
+  ]);
+
+  if (!results || !results.length) {
+    section.innerHTML = `<div class="state-box fade-in"><div class="no-gw-msg">No data for GW${gw}</div><div style="font-size:0.8rem">Results for this gameweek haven't been recorded yet.</div></div>`;
+    return;
+  }
+
+  // Build prediction map
+  const nameMap = {};
+  (profiles||[]).forEach(p => nameMap[p.id] = p.player_name);
+  const predMap = {};
+  (preds||[]).forEach(row => {
+    const name = nameMap[row.user_id] || 'Unknown';
+    if (!predMap[name]) predMap[name] = {};
+    const key = row.match_key.replace(/^\d+_/, '');
+    predMap[name][key] = {home: row.home_score, away: row.away_score};
+  });
+
+  // Build result map
+  const resultMap = {};
+  results.forEach(r => {
+    const key = r.match_key.replace(/^\d+_/, '');
+    resultMap[key] = {home: r.home_score, away: r.away_score, status: r.status};
+  });
+
+  // Calculate GW points per player
+  const gwScores = PLAYERS.map(name => {
+    const p = predMap[name] || {};
+    let pts = 0;
+    Object.keys(resultMap).forEach(key => {
+      const res = resultMap[key];
+      const pred = p[key];
+      if (pred && res.status === 'finished') {
+        pts += calcPoints(pred.home, pred.away, res.home, res.away) || 0;
+      }
+    });
+    return {name, pts};
+  }).sort((a,b) => b.pts - a.pts);
+
+  const myScore = gwScores.find(s => s.name === currentPlayerName);
+  const myRank = gwScores.findIndex(s => s.name === currentPlayerName) + 1;
+  const winner = gwScores[0];
+  const winners = gwScores.filter(s => s.pts === winner.pts);
+  const myPreds = predMap[currentPlayerName] || {};
+
+  // My stats
+  let myPts=0, myCorrectScores=0, myCorrectResults=0;
+  Object.keys(resultMap).forEach(key => {
+    const res = resultMap[key];
+    const pred = myPreds[key];
+    if (pred && res.status === 'finished') {
+      const pts = calcPoints(pred.home, pred.away, res.home, res.away);
+      if (pts === 3) { myPts += 3; myCorrectScores++; }
+      else if (pts === 1) { myPts += 1; myCorrectResults++; }
+    }
+  });
+
+  const prize = (10 / winners.length).toFixed(2);
+  const winnerNames = winners.map(w => w.name).join(' & ');
+  const rankSuffix = myRank===1?'st':myRank===2?'nd':myRank===3?'rd':'th';
+
+  section.innerHTML = `
+    <div class="gw-nav">${gwNavButtons(gw)}</div>
+    <div class="gw-header" style="margin-bottom:1rem">
+      <div>
+        <div class="gw-title">Gameweek ${gw} Review</div>
+        <div class="gw-date">Completed</div>
+      </div>
+      <span class="deadline-pill ok">✓ Complete</span>
+    </div>
+    <div class="winner-banner">
+      <span style="font-size:1.4rem">🏆</span>
+      <div>
+        <div class="winner-banner-text">${winnerNames} · ${winner.pts}pts this week</div>
+        <div class="winner-banner-sub">Weekly pot: £${prize} · Your score: ${myScore?.pts||0}pts (${myRank}${rankSuffix})</div>
+      </div>
+    </div>
+    <div class="pts-summary">
+      <div class="pts-stat"><div class="pts-stat-num" style="color:var(--green)">${myPts}</div><div class="pts-stat-label">Your points</div></div>
+      <div class="pts-stat"><div class="pts-stat-num" style="color:var(--green)">${myCorrectScores}</div><div class="pts-stat-label">Correct scores</div></div>
+      <div class="pts-stat"><div class="pts-stat-num" style="color:var(--amber)">${myCorrectResults}</div><div class="pts-stat-label">Correct results</div></div>
+      <div class="pts-stat"><div class="pts-stat-num" style="color:var(--gold)">${myRank}${rankSuffix}</div><div class="pts-stat-label">This GW</div></div>
+    </div>
+    <div class="section-label">Results &amp; your predictions</div>
+    <div class="fixture-list" id="fixture-list-review"></div>`;
+
+  // Render fixture cards (read-only)
+  const list = document.getElementById('fixture-list-review');
+  Object.keys(resultMap).forEach(key => {
+    const res = resultMap[key];
+    const pred = myPreds[key];
+    const pts = pred ? calcPoints(pred.home, pred.away, res.home, res.away) : null;
+    let cardClass = 'fixture-card';
+    if (pts === 3) cardClass += ' correct-score';
+    else if (pts === 1) cardClass += ' correct-result';
+    else if (pts === 0) cardClass += ' wrong';
+    const parts = key.split('_');
+    const home = parts[0]; const away = parts.slice(1).join('_');
+    const scoreRow = `<div class="live-score">
+      <span class="live-score-num">${res.home}</span>
+      <span class="live-score-sep">:</span>
+      <span class="live-score-num">${res.away}</span>
+    </div>`;
+    const subRow = `<div class="fixture-sub">
+      ${pts!==null?`<span class="result-badge pts-${pts}">${pts===3?'✓ +3pts':pts===1?'~ +1pt':'✗ 0pts'}</span>`:''}
+      ${pred!==undefined?`<span style="color:var(--muted)">You: ${pred.home}–${pred.away}</span>`:'<span style="color:var(--red)">No prediction</span>'}
+    </div>`;
+    const card = document.createElement('div');
+    card.className = cardClass;
+    card.innerHTML = `<div class="fixture-main"><div class="fixture-team home">${home}</div><div class="fixture-crest"></div>${scoreRow}<div class="fixture-crest"></div><div class="fixture-team away">${away}</div></div>${subRow}`;
+    list.appendChild(card);
+  });
+
+  // Predictions table
+  const allKeys = Object.keys(resultMap);
+  const tableHTML = `
+    <div class="section-label" style="margin-top:2rem">All predictions this gameweek</div>
+    <div class="predictions-summary">
+      <table class="pred-table">
+        <thead><tr>
+          <th>Player</th>
+          ${allKeys.map(key => { const p=key.split('_'); return `<th>${p[0]} v ${p.slice(1).join('_')}</th>`; }).join('')}
+          <th>GW pts</th>
+        </tr></thead>
+        <tbody>
+          ${gwScores.map(({name, pts}) => {
+            const p = predMap[name] || {};
+            const isMe = name === currentPlayerName;
+            const cells = allKeys.map(key => {
+              const h=p[key]?.home, a=p[key]?.away;
+              const has = h!==undefined && a!==undefined;
+              const res = resultMap[key];
+              const cp = res && has ? calcPoints(h,a,res.home,res.away) : null;
+              const chipClass = cp===3?'pred-chip chip-correct-score':cp===1?'pred-chip chip-correct-result':cp===0?'pred-chip chip-wrong':'pred-chip';
+              return `<td><span class="${has?chipClass:'pred-chip empty'}">${has?`${h}–${a}`:'–'}</span></td>`;
+            }).join('');
+            return `<tr ${isMe?'class="my-row"':''}>
+              <td style="font-weight:${isMe?'600':'500'}">${name}${isMe?' <span class="you-badge">YOU</span>':''}</td>
+              ${cells}
+              <td style="font-family:'Bebas Neue',sans-serif;font-size:1.2rem;color:var(--green)">${pts}</td>
+            </tr>`;
+          }).join('')}
+        </tbody>
+      </table>
+    </div>`;
+  section.insertAdjacentHTML('beforeend', tableHTML);
+}
+
+function getNextWeekendAfterCurrent(allMatches) {
+  // Get the weekend AFTER the currentMatches weekend
+  const currentDates = new Set(currentMatches.map(m => ukDateStr(m.utcDate)));
+  const now = new Date();
+  const future = allMatches
+    .filter(m => {
+      if (new Date(m.utcDate) <= now) return false;
+      const day = ukWeekday(m.utcDate);
+      if (day !== 'Saturday' && day !== 'Sunday') return false;
+      return !currentDates.has(ukDateStr(m.utcDate));
+    })
+    .sort((a,b) => new Date(a.utcDate) - new Date(b.utcDate));
+
+  if (!future.length) return [];
+  const firstDay = ukWeekday(future[0].utcDate);
+  const firstDate = new Date(future[0].utcDate);
+  const satDate = new Date(firstDate);
+  if (firstDay === 'Sunday') satDate.setUTCDate(satDate.getUTCDate() - 1);
+  const satDateStr = ukDateStr(satDate.toISOString());
+  const sunDate = new Date(satDate);
+  sunDate.setUTCDate(satDate.getUTCDate() + 1);
+  const sunDateStr = ukDateStr(sunDate.toISOString());
+  return future.filter(m => {
+    const d = ukDateStr(m.utcDate);
+    return d === satDateStr || d === sunDateStr;
+  });
+}
+
+async function savePredictionsForGW(gw) {
+  const preds = {};
+  document.querySelectorAll('.score-input').forEach(inp => {
+    const key=inp.dataset.key, side=inp.dataset.side;
+    if (!preds[key]) preds[key] = {};
+    if (inp.value !== '') preds[key][side] = parseInt(inp.value);
+  });
+  const btn = document.getElementById('save-btn');
+  btn.disabled=true; btn.textContent='Saving…';
+  const ok = await saveMyPredictions(gw, preds);
+  btn.disabled=false; btn.textContent='Save my predictions';
+  if (ok) {
+    const msg = document.getElementById('save-msg');
+    msg.classList.add('show');
+    setTimeout(() => msg.classList.remove('show'), 2500);
+    document.querySelectorAll('.score-input').forEach(inp => {
+      const key=inp.dataset.key, side=inp.dataset.side;
+      if (preds[key] && preds[key][side] !== undefined) inp.value = preds[key][side];
+    });
+  }
 }
 
 function getGWDateLabel(matches) {
@@ -789,6 +1140,7 @@ function renderMatchesView(myPreds, deadline, liveMatches, weekend) {
   const pillText=isOpen?'✓ Open · Deadline '+deadline.toLocaleDateString('en-GB',{timeZone:'Europe/London',weekday:'short',day:'numeric',month:'short'})+' · '+deadline.toLocaleTimeString('en-GB',{timeZone:'Europe/London',hour:'2-digit',minute:'2-digit'}):hasLive?'● Live now':'✗ Closed';
 
   section.innerHTML=`
+    <div class="gw-nav">${gwNavButtons(currentGW)}</div>
     <div class="gw-header">
       <div>
         <div class="gw-title">Gameweek ${currentGW}</div>
@@ -870,7 +1222,7 @@ function renderMatchesView(myPreds, deadline, liveMatches, weekend) {
     // Sub row: time/status/pts/prediction below the main row
     let subParts = [];
     if (matchLocked) {
-      if (res?.status==='IN_PLAY') subParts.push('<span class="live-badge">LIVE</span>');
+      if (res?.status==='IN_PLAY') subParts.push('<span class="live-badge"><span class="live-dot"></span>LIVE</span>');
       else if (res?.status==='PAUSED') subParts.push('<span class="live-badge">HT</span>');
       if (pts!==null) subParts.push(`<span class="result-badge pts-${pts}">${pts===3?'✓ +3pts':pts===1?'~ +1pt':'✗ 0pts'}</span>`);
       else subParts.push(`<span>${formatMatchTime(m.utcDate)}</span>`);
