@@ -1361,7 +1361,7 @@ function startCountdown(deadline) {
     parts.push(String(hours).padStart(2,'0') + 'h');
     parts.push(String(mins).padStart(2,'0') + 'm');
     parts.push(String(secs).padStart(2,'0') + 's');
-    if (el) el.textContent = '✓ ' + deadlineLabel + ' · ' + parts.join(' ');
+    if (el) el.textContent = '⏱ Deadline ' + deadlineLabel + ' · ' + parts.join(' ');
   }
   update();
   countdownTimer = setInterval(update, 1000);
