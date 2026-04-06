@@ -93,7 +93,7 @@
   .gw-header { display: flex; align-items: flex-start; justify-content: space-between; margin-bottom: 1rem; flex-wrap: wrap; gap: 0.5rem; overflow: hidden; }
   .gw-title { font-family: 'Bebas Neue', sans-serif; font-size: 2rem; line-height: 1; }
   .gw-date { font-size: 0.75rem; color: var(--muted); }
-  .deadline-pill { font-size: 0.65rem; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; background: rgba(239,83,80,0.1); border: 1px solid rgba(239,83,80,0.3); color: var(--red); border-radius: 20px; padding: 0.25rem 0.7rem; }
+  .deadline-pill { font-size: 0.65rem; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; background: rgba(239,83,80,0.1); border: 1px solid rgba(239,83,80,0.3); color: var(--red); border-radius: 20px; padding: 0.25rem 0.7rem; white-space: nowrap; }
   .deadline-pill.ok { background: rgba(0,230,118,0.08); border-color: rgba(0,230,118,0.2); color: var(--green); }
   .deadline-pill.live { background: rgba(255,167,38,0.1); border-color: rgba(255,167,38,0.3); color: var(--amber); }
   .fixture-list { display: flex; flex-direction: column; gap: 0.6rem; }
@@ -1146,7 +1146,7 @@ function renderMatchesView(myPreds, deadline, liveMatches, weekend) {
         <div class="gw-title">Gameweek ${currentGW}</div>
         <div class="gw-date">${getGWDateLabel(weekend)}</div>
       </div>
-      <div style="display:flex;flex-direction:column;align-items:flex-end;gap:0.35rem;min-width:0;max-width:280px">
+      <div style="display:flex;flex-direction:column;align-items:flex-end;gap:0.35rem;min-width:0">
         ${!deadlinePassed ? '<div id="countdown-timer" class="deadline-pill ok">⏱ calculating…</div>' : '<span class="deadline-pill ' + pillClass + '">' + pillText + '</span>'}
       </div>
     </div>
@@ -1342,7 +1342,7 @@ function startCountdown(deadline) {
   if (!el) return;
   if (countdownTimer) clearInterval(countdownTimer);
 
-  const deadlineLabel = deadline.toLocaleDateString('en-GB',{timeZone:'Europe/London',weekday:'short',day:'numeric',month:'short'}) + ' · ' + deadline.toLocaleTimeString('en-GB',{timeZone:'Europe/London',hour:'2-digit',minute:'2-digit'});
+  const deadlineLabel = deadline.toLocaleDateString('en-GB',{timeZone:'Europe/London',weekday:'short',day:'numeric',month:'short'}).replace(' ', ' ') + ' ' + deadline.toLocaleTimeString('en-GB',{timeZone:'Europe/London',hour:'2-digit',minute:'2-digit'});
 
   function update() {
     const now = new Date();
@@ -1361,7 +1361,7 @@ function startCountdown(deadline) {
     parts.push(String(hours).padStart(2,'0') + 'h');
     parts.push(String(mins).padStart(2,'0') + 'm');
     parts.push(String(secs).padStart(2,'0') + 's');
-    if (el) el.textContent = '⏱ Deadline ' + deadlineLabel + ' · ' + parts.join(' ');
+    if (el) el.textContent = '⏱ ' + deadlineLabel + ' — ' + parts.join(' ');
   }
   update();
   countdownTimer = setInterval(update, 1000);
