@@ -7,6 +7,7 @@
 <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=DM+Sans:wght@300;400;500;700&display=swap" rel="stylesheet">
 <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><rect width='100' height='100' rx='20' fill='%230a0f0a'/><text y='72' x='50' text-anchor='middle' font-size='60' font-family='Arial Black,sans-serif' fill='%2300e676'>G</text></svg>">
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
 <style>
   :root {
     --green: #00e676;
@@ -159,6 +160,9 @@
   .pred-chip.chip-correct-result { background: rgba(255,167,38,0.12); color: var(--amber); }
   .pred-chip.chip-wrong { color: var(--muted); }
 
+  .nudge-banner { display: flex; align-items: center; gap: 0.6rem; background: rgba(255,167,38,0.08); border: 1px solid rgba(255,167,38,0.25); border-left: 3px solid var(--amber); border-radius: 6px; padding: 0.7rem 1rem; font-size: 0.78rem; color: var(--amber); margin-bottom: 1rem; }
+  .nudge-banner.nudge-ok { background: rgba(0,230,118,0.06); border-color: rgba(0,230,118,0.2); border-left-color: var(--green); color: var(--green); }
+  .nudge-icon { font-size: 0.9rem; flex-shrink: 0; }
   .hidden-notice { background: var(--bg3); border: 1px solid var(--border); border-left: 3px solid var(--amber); border-radius: 6px; padding: 0.85rem 1.2rem; font-size: 0.8rem; color: var(--muted); margin-top: 1.5rem; }
   .hidden-notice strong { color: var(--text); }
 
@@ -443,6 +447,7 @@ async function renderLeaderboard() {
     if(maxGW > 0) gwLeaders = gwScores.filter(s=>s.pts===maxGW).map(s=>s.name);
   }
 
+  const gwPointsHasData = Object.keys(gwPoints).length > 0;
   section.innerHTML = `
     <div class="section-label">Season standings</div>
     <div class="leaderboard-card">
@@ -462,7 +467,42 @@ async function renderLeaderboard() {
           </div>
         </div>`;
       }).join('')}
-    </div>`;
+    </div>
+    ${gwPointsHasData ? '<div class="section-label" style="margin-top:2rem">Season position tracker</div><div style="background:var(--card);border:1px solid var(--border);border-radius:10px;padding:1.2rem"><canvas id="position-chart"></canvas></div>' : ''}
+  `;
+
+  if (gwPointsHasData) {
+    const gws = [...new Set(Object.values(gwPoints).flatMap(p=>Object.keys(p)))].map(Number).sort((a,b)=>a-b);
+    const colors = ['#00e676','#ffd54f','#ffa726','#ef5350','#64b5f6','#ce93d8','#80cbc4','#ffcc80','#b0bec5','#a1734e'];
+    const datasets = PLAYERS.map((name,i) => ({
+      label: name,
+      data: gws.map(gw => {
+        const scores = PLAYERS.map(n => ({name:n,total:BASE_SCORES[n]+gws.filter(g=>g<=gw).reduce((s,g)=>s+(gwPoints[n]?.[g]||0),0)})).sort((a,b)=>b.total-a.total);
+        return scores.findIndex(s=>s.name===name)+1;
+      }),
+      borderColor: colors[i%colors.length],
+      backgroundColor: 'transparent',
+      borderWidth: name===currentPlayerName?3:1.5,
+      pointRadius: 3,
+      tension: 0.3
+    }));
+    setTimeout(()=>{
+      const ctx = document.getElementById('position-chart');
+      if(!ctx||!window.Chart) return;
+      new Chart(ctx, {
+        type: 'line',
+        data: {labels: gws.map(g=>'GW'+g), datasets},
+        options: {
+          responsive: true,
+          scales: {
+            y: {reverse:true,min:1,max:PLAYERS.length,ticks:{stepSize:1,color:'#6a7d6a',callback:v=>'#'+v},grid:{color:'#1f2e1f'}},
+            x: {ticks:{color:'#6a7d6a',maxRotation:45},grid:{color:'#1f2e1f'}}
+          },
+          plugins: {legend:{labels:{color:'#e8f5e9',font:{size:11},boxWidth:12}}}
+        }
+      });
+    },150);
+  }
 }
 
 // ── API ───────────────────────────────────────────────────────────────────────
@@ -763,6 +803,14 @@ function renderMatchesView(myPreds, deadline, liveMatches, weekend) {
       <div class="pts-stat"><div class="pts-stat-num">${totalPts}</div><div class="pts-stat-label">Points this GW</div></div>
       <div class="pts-stat"><div class="pts-stat-num" style="color:var(--green)">${correctScores}</div><div class="pts-stat-label">Correct scores</div></div>
       <div class="pts-stat"><div class="pts-stat-num" style="color:var(--amber)">${correctResults}</div><div class="pts-stat-label">Correct results</div></div>
+    </div>` : ''}
+    ${!deadlinePassed && !Object.keys(myPreds).length ? `<div class="nudge-banner">
+      <span class="nudge-icon">⚠</span>
+      <span>You haven't submitted your predictions yet — deadline is ${deadline.toLocaleDateString('en-GB',{timeZone:'Europe/London',weekday:'short',day:'numeric',month:'short'})} at ${deadline.toLocaleTimeString('en-GB',{timeZone:'Europe/London',hour:'2-digit',minute:'2-digit'})}</span>
+    </div>` : ''}
+    ${!deadlinePassed && Object.keys(myPreds).length ? `<div class="nudge-banner nudge-ok">
+      <span class="nudge-icon">✓</span>
+      <span>Predictions submitted — you can still edit until the deadline</span>
     </div>` : ''}
     <div class="section-label">${deadlinePassed ? 'Results & your predictions' : 'Your predictions — '+currentPlayerName}</div>
     <div class="fixture-list" id="fixture-list"></div>
