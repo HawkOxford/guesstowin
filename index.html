@@ -139,7 +139,6 @@
   .pts-stat-label { font-size: 0.65rem; color: var(--muted); letter-spacing: 0.08em; text-transform: uppercase; margin-top: 2px; }
 
   .save-bar { margin-top: 1.5rem; display: flex; align-items: center; gap: 1rem; flex-wrap: wrap; }
-  .countdown-pill { font-size: 0.65rem; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; background: var(--green); color: #031a03; border-radius: 20px; padding: 0.25rem 0.7rem; text-align:center; }
   .btn-save { background: var(--green); color: #031a03; border: none; border-radius: 7px; padding: 0.75rem 2rem; font-family: 'DM Sans', sans-serif; font-weight: 700; font-size: 0.9rem; cursor: pointer; transition: all 0.15s; }
   .btn-save:hover { background: #00ff88; transform: translateY(-1px); }
   .btn-save:disabled { opacity: 0.5; cursor: not-allowed; transform: none; }
@@ -264,10 +263,7 @@
           <table class="pred-table"><thead id="pred-thead"></thead><tbody id="pred-tbody"></tbody></table>
         </div>
       </div>
-      <div class="rules-callout">
-        <strong>Rules:</strong> Submit before the first game kicks off. No changes after kick-off.
-        Correct result = <strong>1pt</strong> · Correct score = <strong>3pts</strong> · Cost: <strong>£2/week</strong>
-      </div>
+
     </div>
   </div>
 
@@ -277,6 +273,10 @@
       <div id="leaderboard-section"><div class="state-box"><div class="spinner"></div><div>Loading standings…</div></div></div>
       <div style="margin-top:1rem;font-size:0.68rem;color:var(--muted);line-height:1.6">
         Season pot accumulates at £1/player/week · Weekly winner splits £10 if tied
+      </div>
+      <div class="rules-callout" style="margin-top:1.5rem">
+        <strong>Rules:</strong> Submit before the first game kicks off. No changes after kick-off.
+        Correct result = <strong>1pt</strong> · Correct score = <strong>3pts</strong> · Cost: <strong>£2/week</strong>
       </div>
     </div>
   </div>
@@ -845,7 +845,7 @@ async function renderGWView(gw) {
         </div>
         <div style="display:flex;flex-direction:column;align-items:flex-end;gap:0.35rem;max-width:280px">
           <span class="deadline-pill ok">${pillText}</span>
-          <div id="countdown-timer" class="countdown-pill">⏱ calculating…</div>
+          <div id="countdown-timer" class="deadline-pill ok">⏱ calculating…</div>
         </div>
       </div>
       ${Object.keys(myPreds).length ? '<div class="nudge-banner nudge-ok"><span class="nudge-icon">✓</span><span>Predictions submitted — you can still edit until the deadline</span></div>' : '<div class="nudge-banner"><span class="nudge-icon">⚠</span><span>You haven&#39;t submitted your predictions yet</span></div>'}
@@ -1147,8 +1147,7 @@ function renderMatchesView(myPreds, deadline, liveMatches, weekend) {
         <div class="gw-date">${getGWDateLabel(weekend)}</div>
       </div>
       <div style="display:flex;flex-direction:column;align-items:flex-end;gap:0.35rem;min-width:0;max-width:280px">
-        <span class="deadline-pill ${pillClass}">${pillText}</span>
-        ${!deadlinePassed ? '<div id="countdown-timer" class="countdown-pill">⏱ calculating…</div>' : ''}
+        ${!deadlinePassed ? '<div id="countdown-timer" class="deadline-pill ok">⏱ calculating…</div>' : '<span class="deadline-pill ' + pillClass + '">' + pillText + '</span>'}
       </div>
     </div>
     ${deadlinePassed ? `<div class="pts-summary">
@@ -1343,12 +1342,14 @@ function startCountdown(deadline) {
   if (!el) return;
   if (countdownTimer) clearInterval(countdownTimer);
 
+  const deadlineLabel = deadline.toLocaleDateString('en-GB',{timeZone:'Europe/London',weekday:'short',day:'numeric',month:'short'}) + ' · ' + deadline.toLocaleTimeString('en-GB',{timeZone:'Europe/London',hour:'2-digit',minute:'2-digit'});
+
   function update() {
     const now = new Date();
     const diff = deadline - now;
     if (diff <= 0) {
       clearInterval(countdownTimer);
-      if (el) el.style.display = 'none';
+      if (el) { el.className = 'deadline-pill live'; el.textContent = '● Live now'; }
       return;
     }
     const days = Math.floor(diff / (1000*60*60*24));
@@ -1360,7 +1361,7 @@ function startCountdown(deadline) {
     parts.push(String(hours).padStart(2,'0') + 'h');
     parts.push(String(mins).padStart(2,'0') + 'm');
     parts.push(String(secs).padStart(2,'0') + 's');
-    if (el) el.textContent = '⏱ ' + parts.join(' ') + ' to deadline';
+    if (el) el.textContent = '✓ ' + deadlineLabel + ' · ' + parts.join(' ');
   }
   update();
   countdownTimer = setInterval(update, 1000);
