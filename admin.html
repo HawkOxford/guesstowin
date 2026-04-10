@@ -153,11 +153,16 @@ async function load() {
   (profiles||[]).forEach(p => profileMap[p.id] = p.player_name);
   const playersWithAccounts = new Set(Object.values(profileMap));
 
+  console.log('profiles:', profiles);
+  console.log('preds count:', preds?.length, preds?.slice(0,3));
+  console.log('profileMap:', profileMap);
+
   // Latest GW - use the most common GW number among recent predictions
   const gwCounts = {};
   (preds||[]).forEach(p => { gwCounts[p.gameweek] = (gwCounts[p.gameweek]||0) + 1; });
   const allGWs = Object.keys(gwCounts).map(Number).sort((a,b)=>b-a);
   const latestGW = allGWs[0] || null;
+  console.log('latestGW:', latestGW, 'gwCounts:', gwCounts);
 
   // Who submitted what for current GW
   // Count predictions per player for current GW - count all rows, not just non-null
