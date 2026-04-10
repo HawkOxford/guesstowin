@@ -49,8 +49,10 @@
 <div id="lock" class="lock">
   <div class="lock-card">
     <div class="lock-title">GTW <span>Admin</span></div>
-    <input class="pin" type="password" id="pin" placeholder="••••" onkeydown="if(event.key==='Enter')unlock()">
-    <button class="lock-btn" onclick="unlock()">Enter</button>
+    <input class="pin" type="password" id="pin" placeholder="Admin PIN" onkeydown="if(event.key==='Enter')unlock()" style="margin-bottom:0.5rem">
+    <input class="pin" type="email" id="admin-email" placeholder="Your email" style="letter-spacing:0;font-size:0.85rem;margin-bottom:0.5rem">
+    <input class="pin" type="password" id="admin-pass" placeholder="Your password" style="letter-spacing:0;font-size:0.85rem" onkeydown="if(event.key==='Enter')unlock()">
+    <button class="lock-btn" onclick="unlock()">Sign In</button>
     <div class="lock-err" id="lock-err">Incorrect PIN</div>
   </div>
 </div>
@@ -74,14 +76,28 @@ const sb = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 const PIN = 'hawk2026';
 const PLAYERS = ['Jake','Glurk','Josh ⭐','Richard ⭐','Teflon','Alex','Gaz ⭐','Liam','Craig','Marcus'];
 
-function unlock() {
-  if (document.getElementById('pin').value === PIN) {
-    document.getElementById('lock').style.display = 'none';
-    document.getElementById('dash').style.display = 'block';
-    load();
-  } else {
+async function unlock() {
+  if (document.getElementById('pin').value !== PIN) {
     document.getElementById('lock-err').style.display = 'block';
+    return;
   }
+  // Sign in as Jake to get authenticated session (needed to read all predictions via RLS)
+  const email = document.getElementById('admin-email').value.trim();
+  const password = document.getElementById('admin-pass').value;
+  if (!email || !password) {
+    document.getElementById('lock-err').textContent = 'Enter your email and password too';
+    document.getElementById('lock-err').style.display = 'block';
+    return;
+  }
+  const { error } = await sb.auth.signInWithPassword({ email, password });
+  if (error) {
+    document.getElementById('lock-err').textContent = 'Sign in failed: ' + error.message;
+    document.getElementById('lock-err').style.display = 'block';
+    return;
+  }
+  document.getElementById('lock').style.display = 'none';
+  document.getElementById('dash').style.display = 'block';
+  load();
 }
 
 function ord(n) { return n + (n===1?'st':n===2?'nd':n===3?'rd':'th'); }
