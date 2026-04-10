@@ -1,0 +1,181 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>GTW Admin</title>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<style>
+  :root { --green:#00e676; --bg:#0a0f0a; --card:#141c14; --border:#1f2e1f; --text:#e8f5e9; --muted:#6a7d6a; --amber:#ffa726; --red:#ef5350; --gold:#ffd54f; }
+  * { box-sizing:border-box; margin:0; padding:0; }
+  body { background:var(--bg); color:var(--text); font-family:sans-serif; min-height:100vh; }
+  .lock { display:flex; align-items:center; justify-content:center; min-height:100vh; padding:2rem; }
+  .lock-card { background:var(--card); border:1px solid var(--border); border-radius:12px; padding:2rem; width:100%; max-width:300px; text-align:center; }
+  .lock-title { font-size:1.3rem; font-weight:900; margin-bottom:1.2rem; }
+  .lock-title span { color:var(--green); }
+  .pin { width:100%; background:#1a231a; border:1px solid var(--border); border-radius:6px; color:var(--text); font-size:1.1rem; padding:0.65rem; margin-bottom:1rem; outline:none; text-align:center; letter-spacing:0.3em; }
+  .pin:focus { border-color:var(--green); }
+  .lock-btn { width:100%; background:var(--green); color:#031a03; border:none; border-radius:6px; padding:0.75rem; font-weight:700; font-size:0.95rem; cursor:pointer; }
+  .lock-err { font-size:0.72rem; color:var(--red); margin-top:0.75rem; display:none; }
+  .dash { padding:1.5rem; max-width:700px; margin:0 auto; }
+  .top { display:flex; justify-content:space-between; align-items:flex-end; margin-bottom:1.5rem; flex-wrap:wrap; gap:0.75rem; }
+  .title { font-size:1.6rem; font-weight:900; }
+  .title span { color:var(--green); }
+  .subtitle { font-size:0.7rem; color:var(--muted); margin-top:3px; }
+  .refresh { background:transparent; border:1px solid var(--border); color:var(--muted); border-radius:6px; padding:0.35rem 0.9rem; font-size:0.72rem; cursor:pointer; }
+  .refresh:hover { border-color:var(--green); color:var(--green); }
+  .panel { background:var(--card); border:1px solid var(--border); border-radius:10px; overflow:hidden; margin-bottom:1.5rem; }
+  .panel-header { display:flex; justify-content:space-between; align-items:center; padding:0.85rem 1rem; border-bottom:1px solid var(--border); }
+  .panel-title { font-size:0.6rem; font-weight:700; letter-spacing:0.2em; text-transform:uppercase; color:var(--green); }
+  .panel-meta { font-size:0.7rem; color:var(--muted); }
+  .row { display:flex; justify-content:space-between; align-items:center; padding:0.65rem 1rem; border-bottom:1px solid rgba(31,46,31,0.5); }
+  .row:last-child { border-bottom:none; }
+  .player-name { font-weight:500; font-size:0.88rem; }
+  .badges { display:flex; gap:0.4rem; align-items:center; flex-wrap:wrap; justify-content:flex-end; }
+  .b { font-size:0.6rem; font-weight:700; border-radius:3px; padding:2px 7px; letter-spacing:0.04em; white-space:nowrap; }
+  .b-green { background:rgba(0,230,118,0.12); color:var(--green); }
+  .b-amber { background:rgba(255,167,38,0.1); color:var(--amber); }
+  .b-red { background:rgba(239,83,80,0.1); color:var(--red); }
+  .b-muted { background:rgba(106,125,106,0.12); color:var(--muted); }
+  .b-gold { background:rgba(255,213,79,0.1); color:var(--gold); }
+  .spinner { width:22px; height:22px; border:2px solid var(--border); border-top-color:var(--green); border-radius:50%; animation:spin 0.8s linear infinite; margin:2rem auto; }
+  @keyframes spin { to{transform:rotate(360deg);} }
+  .progress-bar { height:4px; background:var(--border); border-radius:2px; margin:0 1rem 0.5rem; overflow:hidden; }
+  .progress-fill { height:100%; background:var(--green); border-radius:2px; transition:width 0.4s ease; }
+</style>
+</head>
+<body>
+
+<div id="lock" class="lock">
+  <div class="lock-card">
+    <div class="lock-title">GTW <span>Admin</span></div>
+    <input class="pin" type="password" id="pin" placeholder="••••" onkeydown="if(event.key==='Enter')unlock()">
+    <button class="lock-btn" onclick="unlock()">Enter</button>
+    <div class="lock-err" id="lock-err">Incorrect PIN</div>
+  </div>
+</div>
+
+<div id="dash" class="dash" style="display:none">
+  <div class="top">
+    <div>
+      <div class="title">GTW <span>Admin</span></div>
+      <div class="subtitle" id="subtitle">Loading…</div>
+    </div>
+    <button class="refresh" onclick="load()">↻ Refresh</button>
+  </div>
+  <div id="content"><div class="spinner"></div></div>
+</div>
+
+<script>
+const SUPABASE_URL = 'https://iufbdwsmbwrtcqzkvyey.supabase.co';
+const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Iml1ZmJkd3NtYndydGNxemt2eWV5Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzQ2MTg2MzcsImV4cCI6MjA5MDE5NDYzN30.Q3B-7qr4xWcGpa1UJWKSAd1iu6_-WHaiDcPV4HJ8SNk';
+const sb = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+
+const PIN = 'hawk2026';
+const PLAYERS = ['Jake','Glurk','Josh ⭐','Richard ⭐','Teflon','Alex','Gaz ⭐','Liam','Craig','Marcus'];
+
+function unlock() {
+  if (document.getElementById('pin').value === PIN) {
+    document.getElementById('lock').style.display = 'none';
+    document.getElementById('dash').style.display = 'block';
+    load();
+  } else {
+    document.getElementById('lock-err').style.display = 'block';
+  }
+}
+
+function ord(n) { return n + (n===1?'st':n===2?'nd':n===3?'rd':'th'); }
+
+async function load() {
+  document.getElementById('content').innerHTML = '<div class="spinner"></div>';
+
+  const [{data:profiles},{data:preds},{data:results}] = await Promise.all([
+    sb.from('profiles').select('id,player_name'),
+    sb.from('predictions').select('user_id,gameweek,match_key,home_score,away_score'),
+    sb.from('results').select('gameweek,match_key').eq('status','finished')
+  ]);
+
+  // Profile map
+  const profileMap = {};
+  (profiles||[]).forEach(p => profileMap[p.id] = p.player_name);
+  const playersWithAccounts = new Set(Object.values(profileMap));
+
+  // Latest GW
+  const allGWs = [...new Set((preds||[]).map(p=>p.gameweek))].sort((a,b)=>b-a);
+  const latestGW = allGWs[0] || null;
+
+  // Fixtures in latest GW (from results table)
+  const fixturesThisGW = [...new Set((results||[]).filter(r=>r.gameweek===latestGW).map(r=>r.match_key))];
+  const totalFixtures = fixturesThisGW.length;
+
+  // Who submitted what for current GW
+  const gwPreds = (preds||[]).filter(p=>p.gameweek===latestGW);
+  const submissionMap = {}; // name -> { count, complete }
+  gwPreds.forEach(p => {
+    const name = profileMap[p.user_id];
+    if (!name) return;
+    if (!submissionMap[name]) submissionMap[name] = 0;
+    if (p.home_score !== null && p.away_score !== null) submissionMap[name]++;
+  });
+
+  // GW history per player
+  const gwHistory = {};
+  (preds||[]).forEach(p => {
+    const name = profileMap[p.user_id];
+    if (!name) return;
+    if (!gwHistory[name]) gwHistory[name] = new Set();
+    gwHistory[name].add(p.gameweek);
+  });
+
+  const now = new Date();
+  const time = now.toLocaleTimeString('en-GB',{hour:'2-digit',minute:'2-digit'});
+  const date = now.toLocaleDateString('en-GB',{weekday:'short',day:'numeric',month:'short'});
+  document.getElementById('subtitle').textContent = `${date} · ${time} · GW${latestGW||'—'} active`;
+
+  // Split into submitted / not submitted
+  const submitted = PLAYERS.filter(n => submissionMap[n] > 0);
+  const notSubmitted = PLAYERS.filter(n => !submissionMap[n]);
+  const submittedCount = submitted.length;
+  const pct = Math.round((submittedCount / PLAYERS.length) * 100);
+
+  document.getElementById('content').innerHTML = `
+    <div class="panel">
+      <div class="panel-header">
+        <div class="panel-title">GW${latestGW||'—'} submissions</div>
+        <div class="panel-meta">${submittedCount} / ${PLAYERS.length} submitted</div>
+      </div>
+      <div class="progress-bar"><div class="progress-fill" style="width:${pct}%"></div></div>
+
+      ${PLAYERS.map(name => {
+        const hasAccount = playersWithAccounts.has(name);
+        const count = submissionMap[name] || 0;
+        const complete = totalFixtures > 0 && count >= totalFixtures;
+        const partial = count > 0 && !complete;
+        const gwCount = gwHistory[name] ? gwHistory[name].size : 0;
+
+        let statusBadge;
+        if (!hasAccount) {
+          statusBadge = '<span class="b b-red">✗ No account</span>';
+        } else if (complete) {
+          statusBadge = '<span class="b b-green">✓ All submitted</span>';
+        } else if (partial) {
+          statusBadge = `<span class="b b-amber">⚠ Partial · ${count}/${totalFixtures}</span>`;
+        } else {
+          statusBadge = '<span class="b b-red">✗ Not submitted</span>';
+        }
+
+        return `<div class="row">
+          <div class="player-name">${name}</div>
+          <div class="badges">
+            ${statusBadge}
+            ${hasAccount && gwCount > 0 ? `<span class="b b-muted">${gwCount} GW${gwCount!==1?'s':''} played</span>` : ''}
+          </div>
+        </div>`;
+      }).join('')}
+    </div>`;
+}
+
+document.getElementById('pin').focus();
+</script>
+</body>
+</html>
