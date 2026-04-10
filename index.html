@@ -750,10 +750,20 @@ async function fetchAndRenderFixtures(targetGW) {
     if (refreshTimer) clearInterval(refreshTimer);
     if (deadlinePassed) {
       refreshTimer = setInterval(async () => {
+        // Save any values being typed before refresh
+        const typed = {};
+        document.querySelectorAll('.score-input').forEach(inp => {
+          if (inp.value !== '') typed[inp.dataset.key + '|' + inp.dataset.side] = inp.value;
+        });
         const live = await fetchLiveMatches();
         await syncResultsToSupabase(currentGW, live);
         buildLiveResults(live);
         renderMatchesView(allPredictions[currentPlayerName]||{}, deadline, live, currentMatches);
+        // Restore any typed values not yet saved
+        document.querySelectorAll('.score-input').forEach(inp => {
+          const v = typed[inp.dataset.key + '|' + inp.dataset.side];
+          if (v !== undefined && inp.value === '') inp.value = v;
+        });
       }, 60000);
     }
   } else {
@@ -1119,7 +1129,7 @@ function renderMatchesView(myPreds, deadline, liveMatches, weekend) {
   // Calculate running points for current player
   let totalPts=0, correctScores=0, correctResults=0;
   if(deadlinePassed){
-    currentMatches.forEach((m,i)=>{
+    currentMatches.forEach(m=>{
       const home=cleanTeamName(m.homeTeam?.name)||'Home';
       const away=cleanTeamName(m.awayTeam?.name)||'Away';
       const key=`${home}_${away}`;
@@ -1155,14 +1165,7 @@ function renderMatchesView(myPreds, deadline, liveMatches, weekend) {
       <div class="pts-stat"><div class="pts-stat-num" style="color:var(--green)">${correctScores}</div><div class="pts-stat-label">Correct scores</div></div>
       <div class="pts-stat"><div class="pts-stat-num" style="color:var(--amber)">${correctResults}</div><div class="pts-stat-label">Correct results</div></div>
     </div>` : ''}
-    ${!deadlinePassed && !Object.keys(myPreds).length ? `<div class="nudge-banner">
-      <span class="nudge-icon">⚠</span>
-      <span>You haven't submitted your predictions yet — deadline is ${deadline.toLocaleDateString('en-GB',{timeZone:'Europe/London',weekday:'short',day:'numeric',month:'short'})} at ${deadline.toLocaleTimeString('en-GB',{timeZone:'Europe/London',hour:'2-digit',minute:'2-digit'})}</span>
-    </div>` : ''}
-    ${!deadlinePassed && Object.keys(myPreds).length ? `<div class="nudge-banner nudge-ok">
-      <span class="nudge-icon">✓</span>
-      <span>Predictions submitted — you can still edit until the deadline</span>
-    </div>` : ''}
+    ${!deadlinePassed ? (hasAnyPreds ? '<div class="nudge-banner nudge-ok"><span class="nudge-icon">✓</span><span>Predictions submitted — you can still edit until the deadline</span></div>' : '<div class="nudge-banner"><span class="nudge-icon">⚠</span><span>You haven&#39;t submitted yet</span></div>') : ''}
     <div class="section-label">${deadlinePassed ? 'Results & your predictions' : 'Your predictions — '+currentPlayerName}</div>
     <div class="fixture-list" id="fixture-list"></div>
     ${(isOpen || (!hasAnyPreds && deadlinePassed)) ? `<div class="save-bar">
@@ -1174,7 +1177,7 @@ function renderMatchesView(myPreds, deadline, liveMatches, weekend) {
 
   const list=document.getElementById('fixture-list');
   let lastDay = null;
-  currentMatches.forEach((m,i)=>{
+  currentMatches.forEach(m=>{
     // Add day header when the day changes
     const matchDay = new Date(m.utcDate).toLocaleDateString('en-GB', {timeZone:'Europe/London', weekday:'long', day:'numeric', month:'long'});
     const dayKey = new Date(m.utcDate).toLocaleDateString('en-GB', {timeZone:'Europe/London'});
