@@ -724,7 +724,48 @@ async function plFetch(url) {
 
 async function fetchFixtures() {
   const data = await plFetch('https://api.football-data.org/v4/competitions/PL/matches?status=SCHEDULED,TIMED');
-  return data ? data.matches : null;
+  if (data) return data.matches;
+
+  // API unavailable — reconstruct fixtures from existing Supabase predictions
+  try {
+    const gw = await estimateGWNumber([]);
+    const { data: preds } = await sb.from('predictions').select('match_key,gameweek').eq('gameweek', gw).limit(20);
+    if (!preds || !preds.length) return null;
+    // Build synthetic match objects from match keys so the app can render
+    const seen = new Set();
+    const syntheticMatches = [];
+    preds.forEach(p => {
+      const key = p.match_key.replace(/^\d+_/, '');
+      if (seen.has(key)) return;
+      seen.add(key);
+      const parts = key.split('_');
+      const home = parts[0];
+      const away = parts.slice(1).join('_');
+      // Use a Saturday date placeholder — just enough to pass filterWeekendMatches
+      const sat = nextSaturday();
+      syntheticMatches.push({
+        id: key,
+        utcDate: sat,
+        status: 'SCHEDULED',
+        matchday: gw,
+        homeTeam: { name: home + ' FC', shortName: home, crest: null },
+        awayTeam: { name: away + ' FC', shortName: away, crest: null },
+        score: { fullTime: { home: null, away: null } },
+        isSynthetic: true
+      });
+    });
+    console.warn('API unavailable — using Supabase predictions as fixture source');
+    return syntheticMatches;
+  } catch(e) { return null; }
+}
+
+function nextSaturday() {
+  const d = new Date();
+  const day = d.getUTCDay(); // 0=Sun, 6=Sat
+  const daysUntilSat = (6 - day + 7) % 7 || 7;
+  d.setUTCDate(d.getUTCDate() + daysUntilSat);
+  d.setUTCHours(12, 0, 0, 0);
+  return d.toISOString();
 }
 
 async function fetchLiveMatches() {
