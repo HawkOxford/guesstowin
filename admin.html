@@ -1,4 +1,3 @@
-
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -53,11 +52,10 @@
 <div id="lock" class="lock">
   <div class="lock-card">
     <div class="lock-title">GTW <span>Admin</span></div>
-    <input class="pin code" type="password" id="pin" placeholder="PIN">
     <input class="pin" type="email" id="admin-email" placeholder="Your email">
     <input class="pin" type="password" id="admin-pass" placeholder="Your password" onkeydown="if(event.key==='Enter')unlock()">
     <button class="lock-btn" onclick="unlock()">Sign In</button>
-    <div class="lock-err" id="lock-err">Incorrect PIN or login failed</div>
+    <div class="lock-err" id="lock-err">Login failed</div>
   </div>
 </div>
 
@@ -229,7 +227,7 @@ function renderForGW(gw) {
     </div>`;
 }
 
-document.getElementById('pin').focus();
+document.getElementById('admin-email').focus();
 </script>
 </body>
 </html>
