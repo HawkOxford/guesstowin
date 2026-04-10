@@ -337,6 +337,12 @@ async function sendReset() {
   showSignin();
 }
 
+function guestSignIn() {
+  document.getElementById('app-screen').style.display='none';
+  document.getElementById('auth-screen').style.display='flex';
+  showSignin();
+}
+
 async function loadGuest() {
   document.getElementById('auth-screen').style.display='none';
   document.getElementById('app-screen').style.display='block';
@@ -344,11 +350,7 @@ async function loadGuest() {
   document.getElementById('user-dot').style.background='var(--muted)';
   // Replace sign out button with sign in button for guests
   document.querySelector('.sign-out-btn').textContent='Sign in';
-  document.querySelector('.sign-out-btn').onclick = () => {
-    document.getElementById('app-screen').style.display='none';
-    document.getElementById('auth-screen').style.display='flex';
-    showSignin();
-  };
+  document.querySelector('.sign-out-btn').onclick = guestSignIn;
   currentPlayerName = '';
   currentUser = null;
   viewingGW = null;
@@ -411,7 +413,7 @@ async function fetchAndRenderFixturesGuest() {
       </div>
     </div>
     <div class="guest-banner" style="background:rgba(106,125,106,0.08);border:1px solid var(--border);border-left:3px solid var(--muted);border-radius:6px;padding:0.7rem 1rem;font-size:0.78rem;color:var(--muted);margin-bottom:1rem">
-      Viewing as guest — <a style="color:var(--green);cursor:pointer" onclick="document.getElementById('app-screen').style.display='none';document.getElementById('auth-screen').style.display='flex';showSignin()">sign in to submit predictions</a>
+      Viewing as guest — <a style="color:var(--green);cursor:pointer" onclick="guestSignIn()">sign in to submit predictions</a>
     </div>
     <div class="fixture-list" id="fixture-list"></div>`;
 
