@@ -95,6 +95,43 @@ async function load() {
     sb.from('results').select('gameweek,match_key').eq('status','finished')
   ]);
 
+  // Fetch fixture count from API
+  let totalFixtures = 8; // sensible default
+  try {
+    const apiUrl = 'https://api.football-data.org/v4/competitions/PL/matches?status=SCHEDULED,TIMED';
+    const proxyUrl = 'https://corsproxy.io/?' + encodeURIComponent(apiUrl);
+    const apiRes = await fetch(proxyUrl, {headers:{'X-Auth-Token':'06f21e4fcbf44c9984aa595874172fa2'}});
+    if (apiRes.ok) {
+      const apiData = await apiRes.json();
+      const matches = apiData.matches || [];
+      const now = new Date();
+      // Get upcoming Sat/Sun matches
+      const upcoming = matches.filter(m => {
+        const d = new Date(m.utcDate);
+        if (d <= now) return false;
+        const day = d.toLocaleDateString('en-GB',{timeZone:'Europe/London',weekday:'long'});
+        return day === 'Saturday' || day === 'Sunday';
+      }).sort((a,b)=>new Date(a.utcDate)-new Date(b.utcDate));
+      if (upcoming.length) {
+        const firstDate = upcoming[0].utcDate.slice(0,10);
+        // Get saturday and sunday of that weekend
+        const firstD = new Date(upcoming[0].utcDate);
+        const dayName = firstD.toLocaleDateString('en-GB',{timeZone:'Europe/London',weekday:'long'});
+        const satDate = new Date(firstD);
+        if (dayName === 'Sunday') satDate.setUTCDate(satDate.getUTCDate()-1);
+        const sunDate = new Date(satDate);
+        sunDate.setUTCDate(satDate.getUTCDate()+1);
+        const satStr = satDate.toISOString().slice(0,10);
+        const sunStr = sunDate.toISOString().slice(0,10);
+        const weekend = upcoming.filter(m => {
+          const d = m.utcDate.slice(0,10);
+          return d === satStr || d === sunStr;
+        });
+        totalFixtures = weekend.length || 8;
+      }
+    }
+  } catch(e) { /* use default */ }
+
   // Profile map
   const profileMap = {};
   (profiles||[]).forEach(p => profileMap[p.id] = p.player_name);
@@ -104,19 +141,17 @@ async function load() {
   const allGWs = [...new Set((preds||[]).map(p=>p.gameweek))].sort((a,b)=>b-a);
   const latestGW = allGWs[0] || null;
 
-  // Fixtures in latest GW (from results table)
-  const fixturesThisGW = [...new Set((results||[]).filter(r=>r.gameweek===latestGW).map(r=>r.match_key))];
-  const totalFixtures = fixturesThisGW.length;
-
   // Who submitted what for current GW
   const gwPreds = (preds||[]).filter(p=>p.gameweek===latestGW);
-  const submissionMap = {}; // name -> { count, complete }
+  const submissionMap = {};
   gwPreds.forEach(p => {
     const name = profileMap[p.user_id];
     if (!name) return;
     if (!submissionMap[name]) submissionMap[name] = 0;
     if (p.home_score !== null && p.away_score !== null) submissionMap[name]++;
   });
+
+
 
   // GW history per player
   const gwHistory = {};
