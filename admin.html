@@ -137,18 +137,20 @@ async function load() {
   (profiles||[]).forEach(p => profileMap[p.id] = p.player_name);
   const playersWithAccounts = new Set(Object.values(profileMap));
 
-  // Latest GW
-  const allGWs = [...new Set((preds||[]).map(p=>p.gameweek))].sort((a,b)=>b-a);
+  // Latest GW - use the most common GW number among recent predictions
+  const gwCounts = {};
+  (preds||[]).forEach(p => { gwCounts[p.gameweek] = (gwCounts[p.gameweek]||0) + 1; });
+  const allGWs = Object.keys(gwCounts).map(Number).sort((a,b)=>b-a);
   const latestGW = allGWs[0] || null;
 
   // Who submitted what for current GW
+  // Count predictions per player for current GW - count all rows, not just non-null
   const gwPreds = (preds||[]).filter(p=>p.gameweek===latestGW);
   const submissionMap = {};
   gwPreds.forEach(p => {
     const name = profileMap[p.user_id];
     if (!name) return;
-    if (!submissionMap[name]) submissionMap[name] = 0;
-    if (p.home_score !== null && p.away_score !== null) submissionMap[name]++;
+    submissionMap[name] = (submissionMap[name]||0) + 1;
   });
 
 
