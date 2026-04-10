@@ -349,7 +349,9 @@ async function signOut() {
   await sb.auth.signOut();
   document.getElementById('app-screen').style.display='none';
   document.getElementById('auth-screen').style.display='flex';
-  currentUser=null;currentPlayerName='';
+  currentUser=null; currentPlayerName='';
+  currentGW=null; viewingGW=null; currentMatches=[];
+  allPredictions={}; liveResults={}; deadlinePassed=false;
 }
 
 async function loadApp(user) {
@@ -682,7 +684,7 @@ async function syncResultsToSupabase(gw, liveMatches) {
   // Store finished results in Supabase results table
   const finished = liveMatches.filter(m=>m.status==='FINISHED');
   if(!finished.length) return;
-  const rows = finished.map((m,i)=>{
+  const rows = finished.map(m=>{
     const home=cleanTeamName(m.homeTeam?.name)||'Home';
     const away=cleanTeamName(m.awayTeam?.name)||'Away';
     return {
@@ -853,8 +855,7 @@ async function renderGWView(gw) {
           <div class="gw-title">Gameweek ${gw}</div>
           <div class="gw-date">${getGWDateLabel(nextWeekend)}</div>
         </div>
-        <div style="display:flex;flex-direction:column;align-items:flex-end;gap:0.35rem;max-width:280px">
-          <span class="deadline-pill ok">${pillText}</span>
+        <div style="display:flex;flex-direction:column;align-items:flex-end;gap:0.35rem;min-width:0">
           <div id="countdown-timer" class="deadline-pill ok">⏱ calculating…</div>
         </div>
       </div>
@@ -908,7 +909,7 @@ async function renderGWView(gw) {
   ]);
 
   if (!results || !results.length) {
-    section.innerHTML = `<div class="state-box fade-in"><div class="no-gw-msg">No data for GW${gw}</div><div style="font-size:0.8rem">Results for this gameweek haven't been recorded yet.</div></div>`;
+    section.innerHTML = `<div class="state-box fade-in"><div class="no-gw-msg">No data for GW${gw}</div><div style="font-size:0.8rem">Results for this gameweek have not been recorded yet.</div></div>`;
     return;
   }
 
