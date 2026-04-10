@@ -435,8 +435,8 @@ async function fetchAndRenderFixturesGuest() {
     const away = cleanTeamName(m.awayTeam?.name) || 'Away';
     const key = `${home}_${away}`;
     const res = liveResults[key];
-    const hCrest = m.homeTeam?.crest ? '<img class="team-crest" src="'+m.homeTeam.crest+'" alt="" onerror="this.style.display='none'">' : '';
-    const aCrest = m.awayTeam?.crest ? '<img class="team-crest" src="'+m.awayTeam.crest+'" alt="" onerror="this.style.display='none'">' : '';
+    const hCrest = m.homeTeam?.crest ? '<img class="team-crest" src="' + m.homeTeam.crest + '" alt="">' : '';
+    const aCrest = m.awayTeam?.crest ? '<img class="team-crest" src="' + m.awayTeam.crest + '" alt="">' : '';
 
     let cardClass = 'fixture-card';
     if (res?.status==='IN_PLAY'||res?.status==='PAUSED') cardClass += ' live-now';
@@ -1041,8 +1041,8 @@ async function renderGWView(gw) {
       const away = cleanTeamName(m.awayTeam?.name) || 'Away';
       const key = `${home}_${away}`;
       const pred = myPreds[key];
-      const hCrest = m.homeTeam?.crest ? `<img class="team-crest" src="${m.homeTeam.crest}" alt="" onerror="this.style.display='none'">` : '';
-      const aCrest = m.awayTeam?.crest ? `<img class="team-crest" src="${m.awayTeam.crest}" alt="" onerror="this.style.display='none'">` : '';
+      const hCrest = m.homeTeam?.crest ? '<img class="team-crest" src="' + m.homeTeam.crest + '" alt="">' : '';
+      const aCrest = m.awayTeam?.crest ? '<img class="team-crest" src="' + m.awayTeam.crest + '" alt="">' : '';
       const scoreRow = `<div class="score-inputs">
         <input class="score-input" type="number" min="0" max="20" placeholder="–" data-key="${key}" data-side="home" value="${pred?.home!==undefined?pred.home:''}">
         <span class="score-sep">:</span>
@@ -1362,8 +1362,8 @@ function renderMatchesView(myPreds, deadline, liveMatches, weekend) {
     const matchStarted = res?.status==='IN_PLAY'||res?.status==='PAUSED'||res?.status==='FINISHED';
     const matchLocked = hasAnyPreds ? deadlinePassed : matchStarted;
 
-    const hCrest = m.homeTeam?.crest ? `<img class="team-crest" src="${m.homeTeam.crest}" alt="" onerror="this.style.display='none'">` : '';
-    const aCrest = m.awayTeam?.crest ? `<img class="team-crest" src="${m.awayTeam.crest}" alt="" onerror="this.style.display='none'">` : '';
+    const hCrest = m.homeTeam?.crest ? '<img class="team-crest" src="' + m.homeTeam.crest + '" alt="">' : '';
+    const aCrest = m.awayTeam?.crest ? '<img class="team-crest" src="' + m.awayTeam.crest + '" alt="">' : '';
 
     // Score row only - time and prediction go in subRow below
     const scoreRow = matchLocked
