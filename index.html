@@ -714,23 +714,14 @@ function cleanTeamName(name) {
 }
 
 async function plFetch(url) {
-  const proxies = [
-    'https://corsproxy.io/?' + encodeURIComponent(url),
-    'https://api.allorigins.win/raw?url=' + encodeURIComponent(url),
-    'https://thingproxy.freeboard.io/fetch/' + url,
-  ];
-  for (const proxyUrl of proxies) {
-    try {
-      const res = await fetch(proxyUrl, {headers:{'X-Auth-Token':'06f21e4fcbf44c9984aa595874172fa2'}});
-      if (!res.ok) continue;
-      const data = await res.json();
-      if (data && (data.matches || data.contents)) {
-        // allorigins wraps response in .contents
-        return data.contents ? JSON.parse(data.contents) : data;
-      }
-    } catch(e) { continue; }
+  try {
+    const res = await fetch(url, {headers:{'X-Auth-Token':'06f21e4fcbf44c9984aa595874172fa2'}});
+    if (!res.ok) throw new Error(res.status);
+    return await res.json();
+  } catch(e) {
+    console.warn('API fetch failed:', e.message);
+    return null;
   }
-  return null;
 }
 
 async function fetchFixtures() {
