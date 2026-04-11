@@ -773,12 +773,12 @@ async function fetchLiveMatches() {
   let dateFrom, dateTo;
   if (currentMatches.length) {
     const dates = currentMatches.map(m => ukDateStr(m.utcDate)).sort();
-    dateFrom = dates[0];
-    dateTo = dates[dates.length-1];
+    dateFrom = dates[0].slice(0,10);
+    dateTo = dates[dates.length-1].slice(0,10);
   } else {
     // Fallback: fetch today and tomorrow
-    const today = ukDateStr(new Date().toISOString());
-    const tomorrow = ukDateStr(new Date(Date.now()+86400000).toISOString());
+    const today = ukDateStr(new Date().toISOString()).slice(0,10);
+    const tomorrow = ukDateStr(new Date(Date.now()+86400000).toISOString()).slice(0,10);
     dateFrom = today;
     dateTo = tomorrow;
   }
@@ -913,8 +913,8 @@ async function fetchAndRenderFixtures(targetGW) {
   if (upcomingWeekend.length) {
     // There are still upcoming fixtures this weekend — fetch the full weekend by date range
     const dates = upcomingWeekend.map(m => ukDateStr(m.utcDate)).sort();
-    const satDate = dates[0];
-    const sunDate = dates[dates.length - 1];
+    const satDate = dates[0].slice(0,10);
+    const sunDate = dates[dates.length - 1].slice(0,10);
     // Fetch all matches for this weekend's date range (includes FINISHED/IN_PLAY)
     const data = await plFetch(
       `https://api.football-data.org/v4/competitions/PL/matches?dateFrom=${satDate}&dateTo=${sunDate}`
@@ -1603,3 +1603,4 @@ sb.auth.onAuthStateChange((event,session)=>{if(event==='SIGNED_IN'&&session?.use
 </script>
 </body>
 </html>
+
