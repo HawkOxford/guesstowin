@@ -810,40 +810,39 @@ async function fetchLiveMatches() {
 
 function filterWeekendMatches(matches) {
   const now = new Date();
-
-  // Find ALL Sat/Sun matches — including already-started ones on the current weekend
-  const satSun = matches
-    .filter(m => {
-      const day = ukWeekday(m.utcDate);
-      return day === 'Saturday' || day === 'Sunday';
-    })
-    .sort((a, b) => new Date(a.utcDate) - new Date(b.utcDate));
-
-  if (!satSun.length) return [];
-
-  // Find the most relevant weekend:
-  // If any Sat/Sun match is in the future or started today, use that weekend
-  // Otherwise use the next upcoming weekend
   const todayStr = ukDateStr(now.toISOString());
+  const todayDay = now.toLocaleDateString('en-GB', {timeZone:'Europe/London', weekday:'long'});
 
-  // Find the first match that is either today or in the future
-  const firstRelevant = satSun.find(m => ukDateStr(m.utcDate) >= todayStr);
-  if (!firstRelevant) return [];
+  // Calculate this weekend's Saturday and Sunday dates
+  // If today is Sunday, Saturday was yesterday
+  // If today is Saturday, Sunday is tomorrow
+  // If today is weekday, find next Saturday
+  let satDate = new Date(now);
+  if (todayDay === 'Sunday') {
+    // Saturday was yesterday - go back 1 day
+    satDate = new Date(now);
+    satDate.setDate(satDate.getDate() - 1);
+  } else if (todayDay === 'Saturday') {
+    // Today is Saturday
+  } else {
+    // Find next Saturday
+    const daysUntilSat = (6 - now.getDay() + 7) % 7 || 7;
+    satDate.setDate(satDate.getDate() + daysUntilSat);
+  }
 
-  const firstDay = ukWeekday(firstRelevant.utcDate);
-  const firstDate = new Date(firstRelevant.utcDate);
-  const satDate = new Date(firstDate);
-  if (firstDay === 'Sunday') satDate.setUTCDate(satDate.getUTCDate() - 1);
   const satDateStr = ukDateStr(satDate.toISOString());
   const sunDate = new Date(satDate);
-  sunDate.setUTCDate(satDate.getUTCDate() + 1);
+  sunDate.setDate(satDate.getDate() + 1);
   const sunDateStr = ukDateStr(sunDate.toISOString());
 
-  // Return ALL matches on that Sat/Sun — including already-kicked-off ones
-  return satSun.filter(m => {
+  // Return ALL PL matches on that Saturday or Sunday regardless of status
+  const weekend = matches.filter(m => {
     const d = ukDateStr(m.utcDate);
-    return d === satDateStr || d === sunDateStr;
-  });
+    const day = ukWeekday(m.utcDate);
+    return (day === 'Saturday' || day === 'Sunday') && (d === satDateStr || d === sunDateStr);
+  }).sort((a,b) => new Date(a.utcDate) - new Date(b.utcDate));
+
+  return weekend;
 }
 
 function formatMatchTime(utcDate) {
@@ -931,18 +930,28 @@ async function fetchAndRenderFixtures(targetGW) {
   const upcomingWeekend = allMatches ? filterWeekendMatches(allMatches) : [];
 
   if (upcomingWeekend.length) {
-    // There are still upcoming fixtures this weekend — fetch the full weekend by date range
-    const dates = upcomingWeekend.map(m => ukDateStr(m.utcDate)).sort();
-    const satDate = dates[0].slice(0,10);
-    const sunDate = dates[dates.length - 1].slice(0,10);
-    // Fetch all matches for this weekend's date range (includes FINISHED/IN_PLAY)
+    // Fetch full weekend by date range (includes FINISHED/IN_PLAY/SCHEDULED)
+    // Use the fixed filterWeekendMatches to get correct Sat+Sun dates
+    const now = new Date();
+    const todayDay = now.toLocaleDateString('en-GB', {timeZone:'Europe/London', weekday:'long'});
+    let satDate = new Date(now);
+    if (todayDay === 'Sunday') satDate.setDate(satDate.getDate() - 1);
+    else if (todayDay !== 'Saturday') {
+      const daysUntilSat = (6 - now.getDay() + 7) % 7 || 7;
+      satDate.setDate(satDate.getDate() + daysUntilSat);
+    }
+    const satStr = ukDateStr(satDate.toISOString()).slice(0,10);
+    const sunDate = new Date(satDate);
+    sunDate.setDate(satDate.getDate() + 1);
+    const sunStr = ukDateStr(sunDate.toISOString()).slice(0,10);
+
     const data = await plFetch(
-      `https://api.football-data.org/v4/competitions/PL/matches?dateFrom=${satDate}&dateTo=${sunDate}`
+      `https://api.football-data.org/v4/competitions/PL/matches?dateFrom=${satStr}&dateTo=${sunStr}`
     );
     if (data && data.matches) {
       weekend = data.matches.filter(m => {
-        const d = ukDateStr(m.utcDate);
-        return d === satDate || d === sunDate;
+        const d = ukDateStr(m.utcDate).slice(0,10);
+        return d === satStr || d === sunStr;
       });
     } else {
       weekend = upcomingWeekend;
