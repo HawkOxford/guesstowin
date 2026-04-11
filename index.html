@@ -723,7 +723,11 @@ async function plFetch(url) {
   const proxyUrl = SUPABASE_PROXY + '?path=' + encodeURIComponent('/v4' + path) + (query ? '&query=' + encodeURIComponent(query) : '');
   
   try {
-    const res = await fetch(proxyUrl);
+    const session = await sb.auth.getSession();
+    const token = session?.data?.session?.access_token || SUPABASE_KEY;
+    const res = await fetch(proxyUrl, {
+      headers: { 'Authorization': 'Bearer ' + token }
+    });
     if (!res.ok) throw new Error(res.status);
     return await res.json();
   } catch(e) {
