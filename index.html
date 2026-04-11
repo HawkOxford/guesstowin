@@ -891,7 +891,7 @@ async function saveMyPredictions(gw,preds) {
 }
 
 async function syncResultsToSupabase(gw, liveMatches) {
-  // Store finished results in Supabase results table
+  if (!gw) { console.warn('syncResultsToSupabase: null GW, skipping'); return; }
   const finished = liveMatches.filter(m=>m.status==='FINISHED');
   if(!finished.length) return;
   const rows = finished.map(m=>{
@@ -912,8 +912,11 @@ async function syncResultsToSupabase(gw, liveMatches) {
 async function fetchAndRenderFixtures(targetGW) {
   const section = document.getElementById('fixtures-section');
 
-  // Always fetch live matches first during the weekend — they include IN_PLAY/FINISHED too
-  // This ensures we never miss Saturday games that have already kicked off
+  // Set currentGW first from Supabase so it's always available
+  if (!currentGW) {
+    currentGW = await estimateGWNumber([]);
+  }
+
   let weekend = [];
 
   // Try to get the current weekend from live fetch (date-based, returns all statuses)
@@ -973,10 +976,6 @@ async function fetchAndRenderFixtures(targetGW) {
   // Set currentMatches ONCE on first load
   if (!currentMatches.length) {
     currentMatches = weekend.sort((a,b) => new Date(a.utcDate) - new Date(b.utcDate));
-  }
-  // Always ensure currentGW is set
-  if (!currentGW) {
-    currentGW = await estimateGWNumber(currentMatches);
   }
 
   if (!viewingGW) viewingGW = currentGW;
