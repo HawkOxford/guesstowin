@@ -791,10 +791,9 @@ async function fetchLiveMatches() {
 function filterWeekendMatches(matches) {
   const now = new Date();
 
-  // Step 1: keep only future Saturday and Sunday matches in UK time
+  // Find ALL Sat/Sun matches — including already-started ones on the current weekend
   const satSun = matches
     .filter(m => {
-      if (new Date(m.utcDate) <= now) return false;
       const day = ukWeekday(m.utcDate);
       return day === 'Saturday' || day === 'Sunday';
     })
@@ -802,22 +801,25 @@ function filterWeekendMatches(matches) {
 
   if (!satSun.length) return [];
 
-  // Step 2: find the Saturday of the first upcoming Sat/Sun match
-  // If first match is a Sunday, the Saturday is the day before
-  const firstDay = ukWeekday(satSun[0].utcDate);
+  // Find the most relevant weekend:
+  // If any Sat/Sun match is in the future or started today, use that weekend
+  // Otherwise use the next upcoming weekend
+  const todayStr = ukDateStr(now.toISOString());
 
-  // Work out what Saturday date this weekend belongs to
-  const firstMatchDate = new Date(satSun[0].utcDate);
-  const satDate = new Date(firstMatchDate);
+  // Find the first match that is either today or in the future
+  const firstRelevant = satSun.find(m => ukDateStr(m.utcDate) >= todayStr);
+  if (!firstRelevant) return [];
+
+  const firstDay = ukWeekday(firstRelevant.utcDate);
+  const firstDate = new Date(firstRelevant.utcDate);
+  const satDate = new Date(firstDate);
   if (firstDay === 'Sunday') satDate.setUTCDate(satDate.getUTCDate() - 1);
   const satDateStr = ukDateStr(satDate.toISOString());
-
-  // Step 3: calculate the Sunday date (day after Saturday)
   const sunDate = new Date(satDate);
   sunDate.setUTCDate(satDate.getUTCDate() + 1);
   const sunDateStr = ukDateStr(sunDate.toISOString());
 
-  // Step 4: return only matches on that Saturday or Sunday
+  // Return ALL matches on that Sat/Sun — including already-kicked-off ones
   return satSun.filter(m => {
     const d = ukDateStr(m.utcDate);
     return d === satDateStr || d === sunDateStr;
@@ -899,17 +901,46 @@ async function syncResultsToSupabase(gw, liveMatches) {
 async function fetchAndRenderFixtures(targetGW) {
   const section = document.getElementById('fixtures-section');
 
-  // Step 1: get upcoming fixtures
-  const allMatches = await fetchFixtures();
-  let weekend = allMatches ? filterWeekendMatches(allMatches) : [];
+  // Always fetch live matches first during the weekend — they include IN_PLAY/FINISHED too
+  // This ensures we never miss Saturday games that have already kicked off
+  let weekend = [];
 
-  // Step 2: fallback to live matches if no upcoming found
-  if (!weekend.length) {
-    currentGW = await estimateGWNumber([]);
+  // Try to get the current weekend from live fetch (date-based, returns all statuses)
+  // We need to know the weekend dates first — get from scheduled fixtures
+  const allMatches = await fetchFixtures();
+  const upcomingWeekend = allMatches ? filterWeekendMatches(allMatches) : [];
+
+  if (upcomingWeekend.length) {
+    // There are still upcoming fixtures this weekend — fetch the full weekend by date range
+    const dates = upcomingWeekend.map(m => ukDateStr(m.utcDate)).sort();
+    const satDate = dates[0];
+    const sunDate = dates[dates.length - 1];
+    // Fetch all matches for this weekend's date range (includes FINISHED/IN_PLAY)
+    const data = await plFetch(
+      `https://api.football-data.org/v4/competitions/PL/matches?dateFrom=${satDate}&dateTo=${sunDate}`
+    );
+    if (data && data.matches) {
+      weekend = data.matches.filter(m => {
+        const d = ukDateStr(m.utcDate);
+        return d === satDate || d === sunDate;
+      });
+    } else {
+      weekend = upcomingWeekend;
+    }
+  } else {
+    // No upcoming matches — check if we're mid-weekend using live fetch
     const live = await fetchLiveMatches();
     if (live && live.length) {
-      weekend = live.filter(m => ['Saturday','Sunday'].includes(ukWeekday(m.utcDate)));
-      if (!weekend.length) weekend = live;
+      const todayStr = ukDateStr(new Date().toISOString());
+      const todayDay = new Date().toLocaleDateString('en-GB',{timeZone:'Europe/London',weekday:'long'});
+      if (todayDay === 'Saturday' || todayDay === 'Sunday') {
+        weekend = live.filter(m => {
+          const d = ukDateStr(m.utcDate);
+          const day = ukWeekday(m.utcDate);
+          return (day === 'Saturday' || day === 'Sunday') && 
+                 Math.abs(new Date(m.utcDate) - new Date()) < 2 * 24 * 60 * 60 * 1000;
+        });
+      }
     }
   }
 
@@ -918,23 +949,24 @@ async function fetchAndRenderFixtures(targetGW) {
     return;
   }
 
-  // Step 3: set currentMatches ONCE
+  // Set currentMatches ONCE on first load
   if (!currentMatches.length) {
-    currentMatches = weekend;
-    currentGW = await estimateGWNumber(weekend);
+    currentMatches = weekend.sort((a,b) => new Date(a.utcDate) - new Date(b.utcDate));
+    currentGW = await estimateGWNumber(currentMatches);
   }
 
-  // If no targetGW specified, show current GW
   if (!viewingGW) viewingGW = currentGW;
 
-  // If viewing current GW
   if (viewingGW === currentGW) {
     allPredictions = await loadAllPredictions(currentGW);
     const myPreds = allPredictions[currentPlayerName] || {};
+
+    // Deadline = first kick-off of the gameweek
     const deadline = currentMatches.map(m=>new Date(m.utcDate)).sort((a,b)=>a-b)[0];
     const now = new Date();
     deadlinePassed = now >= deadline;
 
+    // Always fetch live scores once deadline has passed
     let liveMatches = [];
     if (deadlinePassed) {
       liveMatches = await fetchLiveMatches();
@@ -949,7 +981,6 @@ async function fetchAndRenderFixtures(targetGW) {
     if (refreshTimer) clearInterval(refreshTimer);
     if (deadlinePassed) {
       refreshTimer = setInterval(async () => {
-        // Save any values being typed before refresh
         const typed = {};
         document.querySelectorAll('.score-input').forEach(inp => {
           if (inp.value !== '') typed[inp.dataset.key + '|' + inp.dataset.side] = inp.value;
@@ -958,7 +989,6 @@ async function fetchAndRenderFixtures(targetGW) {
         await syncResultsToSupabase(currentGW, live);
         buildLiveResults(live);
         renderMatchesView(allPredictions[currentPlayerName]||{}, deadline, live, currentMatches);
-        // Restore any typed values not yet saved
         document.querySelectorAll('.score-input').forEach(inp => {
           const v = typed[inp.dataset.key + '|' + inp.dataset.side];
           if (v !== undefined && inp.value === '') inp.value = v;
@@ -966,7 +996,6 @@ async function fetchAndRenderFixtures(targetGW) {
       }, 60000);
     }
   } else {
-    // Viewing a past or future GW
     if (refreshTimer) clearInterval(refreshTimer);
     if (countdownTimer) { clearInterval(countdownTimer); countdownTimer = null; }
     await renderGWView(viewingGW);
