@@ -846,7 +846,7 @@ async function estimateGWNumber(matches) {
 
 // ── Supabase predictions ───────────────────────────────────────────────────────
 async function loadAllPredictions(gw) {
-  // Fetch predictions and profiles separately to avoid join issues
+  if (!gw) return {};
   const [{data:preds,error:predErr},{data:profiles,error:profErr}] = await Promise.all([
     sb.from('predictions').select('user_id,match_key,home_score,away_score').eq('gameweek',gw),
     sb.from('profiles').select('id,player_name')
@@ -952,6 +952,9 @@ async function fetchAndRenderFixtures(targetGW) {
   // Set currentMatches ONCE on first load
   if (!currentMatches.length) {
     currentMatches = weekend.sort((a,b) => new Date(a.utcDate) - new Date(b.utcDate));
+  }
+  // Always ensure currentGW is set
+  if (!currentGW) {
     currentGW = await estimateGWNumber(currentMatches);
   }
 
@@ -1603,4 +1606,3 @@ sb.auth.onAuthStateChange((event,session)=>{if(event==='SIGNED_IN'&&session?.use
 </script>
 </body>
 </html>
-
