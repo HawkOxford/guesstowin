@@ -734,6 +734,34 @@ async function plFetch(url) {
   }
 }
 
+async function fixturesFromPredictions(gw) {
+  // Reconstruct fixture list from Supabase predictions when API unavailable
+  try {
+    const { data: preds } = await sb.from('predictions').select('match_key,gameweek').eq('gameweek', gw).limit(20);
+    if (!preds || !preds.length) return [];
+    const seen = new Set();
+    const syntheticMatches = [];
+    preds.forEach(p => {
+      const key = p.match_key.replace(/^\d+_/, '');
+      if (seen.has(key)) return;
+      seen.add(key);
+      const parts = key.split('_');
+      const home = parts[0];
+      const away = parts.slice(1).join('_');
+      const sat = nextSaturday();
+      syntheticMatches.push({
+        id: key, utcDate: sat, status: 'SCHEDULED', matchday: gw,
+        homeTeam: { name: home + ' FC', shortName: home, crest: null },
+        awayTeam: { name: away + ' FC', shortName: away, crest: null },
+        score: { fullTime: { home: null, away: null } },
+        isSynthetic: true
+      });
+    });
+    console.warn('API unavailable — using Supabase predictions as fixture source');
+    return syntheticMatches;
+  } catch(e) { return []; }
+}
+
 async function fetchFixtures() {
   const data = await plFetch('https://api.football-data.org/v4/competitions/PL/matches?status=SCHEDULED,TIMED');
   if (data) return data.matches;
@@ -912,60 +940,40 @@ async function syncResultsToSupabase(gw, liveMatches) {
 async function fetchAndRenderFixtures(targetGW) {
   const section = document.getElementById('fixtures-section');
 
-  // Set currentGW first from Supabase so it's always available
-  if (!currentGW) {
-    currentGW = await estimateGWNumber([]);
-  }
+  // Set currentGW first from Supabase
+  if (!currentGW) currentGW = await estimateGWNumber([]);
 
   let weekend = [];
 
-  // Try to get the current weekend from live fetch (date-based, returns all statuses)
-  // We need to know the weekend dates first — get from scheduled fixtures
-  const allMatches = await fetchFixtures();
-  const upcomingWeekend = allMatches ? filterWeekendMatches(allMatches) : [];
+  // Calculate this weekend's Sat/Sun dates directly — no need to call fetchFixtures first
+  const now = new Date();
+  const todayDay = now.toLocaleDateString('en-GB', {timeZone:'Europe/London', weekday:'long'});
+  let satDate = new Date(now);
+  if (todayDay === 'Sunday') satDate.setDate(satDate.getDate() - 1);
+  else if (todayDay !== 'Saturday') {
+    const daysUntilSat = (6 - now.getDay() + 7) % 7 || 7;
+    satDate.setDate(satDate.getDate() + daysUntilSat);
+  }
+  const satStr = ukDateStr(satDate.toISOString()).slice(0,10);
+  const sunDate = new Date(satDate);
+  sunDate.setDate(satDate.getDate() + 1);
+  const sunStr = ukDateStr(sunDate.toISOString()).slice(0,10);
 
-  if (upcomingWeekend.length) {
-    // Fetch full weekend by date range (includes FINISHED/IN_PLAY/SCHEDULED)
-    // Use the fixed filterWeekendMatches to get correct Sat+Sun dates
-    const now = new Date();
-    const todayDay = now.toLocaleDateString('en-GB', {timeZone:'Europe/London', weekday:'long'});
-    let satDate = new Date(now);
-    if (todayDay === 'Sunday') satDate.setDate(satDate.getDate() - 1);
-    else if (todayDay !== 'Saturday') {
-      const daysUntilSat = (6 - now.getDay() + 7) % 7 || 7;
-      satDate.setDate(satDate.getDate() + daysUntilSat);
-    }
-    const satStr = ukDateStr(satDate.toISOString()).slice(0,10);
-    const sunDate = new Date(satDate);
-    sunDate.setDate(satDate.getDate() + 1);
-    const sunStr = ukDateStr(sunDate.toISOString()).slice(0,10);
+  // Fetch all PL matches for this weekend by date range — includes all statuses
+  const data = await plFetch(
+    `https://api.football-data.org/v4/competitions/PL/matches?dateFrom=${satStr}&dateTo=${sunStr}`
+  );
+  if (data && data.matches) {
+    weekend = data.matches.filter(m => {
+      const d = ukDateStr(m.utcDate).slice(0,10);
+      const day = ukWeekday(m.utcDate);
+      return (day === 'Saturday' || day === 'Sunday') && (d === satStr || d === sunStr);
+    });
+  }
 
-    const data = await plFetch(
-      `https://api.football-data.org/v4/competitions/PL/matches?dateFrom=${satStr}&dateTo=${sunStr}`
-    );
-    if (data && data.matches) {
-      weekend = data.matches.filter(m => {
-        const d = ukDateStr(m.utcDate).slice(0,10);
-        return d === satStr || d === sunStr;
-      });
-    } else {
-      weekend = upcomingWeekend;
-    }
-  } else {
-    // No upcoming matches — check if we're mid-weekend using live fetch
-    const live = await fetchLiveMatches();
-    if (live && live.length) {
-      const todayStr = ukDateStr(new Date().toISOString());
-      const todayDay = new Date().toLocaleDateString('en-GB',{timeZone:'Europe/London',weekday:'long'});
-      if (todayDay === 'Saturday' || todayDay === 'Sunday') {
-        weekend = live.filter(m => {
-          const d = ukDateStr(m.utcDate);
-          const day = ukWeekday(m.utcDate);
-          return (day === 'Saturday' || day === 'Sunday') && 
-                 Math.abs(new Date(m.utcDate) - new Date()) < 2 * 24 * 60 * 60 * 1000;
-        });
-      }
-    }
+  // Fallback: use Supabase predictions as fixture source if API unavailable
+  if (!weekend.length) {
+    weekend = await fixturesFromPredictions(currentGW);
   }
 
   if (!weekend.length) {
