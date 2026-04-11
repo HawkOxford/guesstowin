@@ -902,7 +902,7 @@ async function loadAllPredictions(gw) {
     if(!result[name])result[name]={};
     // Support both old key format (0_Home_Away) and new (Home_Away)
     const key=row.match_key.replace(/^\d+_/,'');
-    result[name][key]={home:row.home_score,away:row.away_score};
+    result[name][key]={home:row.home_score??0,away:row.away_score??0};
   });
   return result;
 }
@@ -919,7 +919,7 @@ async function saveMyPredictions(gw,preds) {
 }
 
 async function syncResultsToSupabase(gw, liveMatches) {
-  if (!gw) { console.warn('syncResultsToSupabase: null GW, skipping'); return; }
+  if (!gw) return;
   const finished = liveMatches.filter(m=>m.status==='FINISHED');
   if(!finished.length) return;
   const rows = finished.map(m=>{
@@ -933,7 +933,17 @@ async function syncResultsToSupabase(gw, liveMatches) {
       status: 'finished'
     };
   });
-  await sb.from('results').upsert(rows,{onConflict:'gameweek,match_key'});
+  // Write via Edge Function using service role — prevents unauthorised writes
+  try {
+    await fetch(SUPABASE_PROXY + '?action=sync-results', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': 'Bearer ' + SUPABASE_KEY
+      },
+      body: JSON.stringify({ rows })
+    });
+  } catch(e) { console.warn('sync failed:', e.message); }
 }
 
 // ── Main render ───────────────────────────────────────────────────────────────
@@ -1568,13 +1578,13 @@ function renderSummary(myPreds) {
           <th>GW pts</th>
         </tr></thead>
         <tbody>
-          ${PLAYERS.map(name => {
+          ${[...PLAYERS].map(name => {
             const preds = allPredictions[name] || {};
-            const isMe = name === currentPlayerName;
             let gwTotal = 0;
             const cells = allKeys.map(({key}) => {
-              const h = preds[key]?.home, a = preds[key]?.away;
-              const has = h !== undefined && a !== undefined;
+              const h = preds[key]?.home ?? null;
+              const a = preds[key]?.away ?? null;
+              const has = h !== null && a !== null;
               const res = liveResults[key];
               const pts = res && has ? calcPoints(h, a, res.home, res.away) : null;
               if (pts === 3) gwTotal += 3;
@@ -1582,8 +1592,11 @@ function renderSummary(myPreds) {
               const chipClass = pts === 3 ? 'pred-chip chip-correct-score'
                 : pts === 1 ? 'pred-chip chip-correct-result'
                 : pts === 0 ? 'pred-chip chip-wrong' : 'pred-chip';
-              return `<td><span class="${has ? chipClass : 'pred-chip empty'}">${has ? `${h}–${a}` : '–'}</span></td>`;
+              return `<td><span class="${has ? chipClass : 'pred-chip empty'}">${has ? h+'–'+a : '–'}</span></td>`;
             }).join('');
+            return { name, gwTotal, cells };
+          }).sort((a,b) => b.gwTotal - a.gwTotal).map(({name, gwTotal, cells}) => {
+            const isMe = name === currentPlayerName;
             return `<tr ${isMe ? 'class="my-row"' : ''}>
               <td style="font-weight:${isMe ? '600' : '500'}">${name}${isMe ? ' <span class="you-badge">YOU</span>' : ''}</td>
               ${cells}
