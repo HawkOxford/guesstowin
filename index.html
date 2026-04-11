@@ -729,16 +729,8 @@ async function plFetch(url) {
     if (!res.ok) throw new Error(res.status);
     return await res.json();
   } catch(e) {
-    // Fallback to corsproxy if Supabase function not yet deployed
-    try {
-      const fallback = 'https://corsproxy.io/?' + encodeURIComponent(url);
-      const res2 = await fetch(fallback, {headers:{'X-Auth-Token':'06f21e4fcbf44c9984aa595874172fa2'}});
-      if (!res2.ok) throw new Error(res2.status);
-      return await res2.json();
-    } catch(e2) {
-      console.warn('API unavailable:', e2.message);
-      return null;
-    }
+    console.warn('API unavailable:', e.message);
+    return null;
   }
 }
 
