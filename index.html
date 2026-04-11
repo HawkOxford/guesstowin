@@ -713,14 +713,30 @@ function cleanTeamName(name) {
   return map[name] || name.replace(' FC', '').replace(' AFC', '');
 }
 
+const SUPABASE_PROXY = 'https://iufbdwsmbwrtcqzkvyey.supabase.co/functions/v1/football-proxy';
+
 async function plFetch(url) {
+  // Extract path and query from full URL for the Supabase proxy
+  const parsed = new URL(url);
+  const path = parsed.pathname.replace('/v4', '');
+  const query = parsed.search.slice(1); // remove leading ?
+  const proxyUrl = SUPABASE_PROXY + '?path=' + encodeURIComponent('/v4' + path) + (query ? '&query=' + encodeURIComponent(query) : '');
+  
   try {
-    const res = await fetch(url, {headers:{'X-Auth-Token':'06f21e4fcbf44c9984aa595874172fa2'}});
+    const res = await fetch(proxyUrl);
     if (!res.ok) throw new Error(res.status);
     return await res.json();
   } catch(e) {
-    console.warn('API fetch failed:', e.message);
-    return null;
+    // Fallback to corsproxy if Supabase function not yet deployed
+    try {
+      const fallback = 'https://corsproxy.io/?' + encodeURIComponent(url);
+      const res2 = await fetch(fallback, {headers:{'X-Auth-Token':'06f21e4fcbf44c9984aa595874172fa2'}});
+      if (!res2.ok) throw new Error(res2.status);
+      return await res2.json();
+    } catch(e2) {
+      console.warn('API unavailable:', e2.message);
+      return null;
+    }
   }
 }
 
