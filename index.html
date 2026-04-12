@@ -752,8 +752,14 @@ function cleanTeamName(name) {
 }
 
 const SUPABASE_PROXY = 'https://iufbdwsmbwrtcqzkvyey.supabase.co/functions/v1/football-proxy';
+const plCache = {}; // simple in-memory cache
+const CACHE_TTL = 45000; // 45 seconds
 
 async function plFetch(url) {
+  const now = Date.now();
+  if (plCache[url] && now - plCache[url].ts < CACHE_TTL) {
+    return plCache[url].data;
+  }
   // Extract path and query from full URL for the Supabase proxy
   const parsed = new URL(url);
   const path = parsed.pathname.replace('/v4', '');
@@ -765,7 +771,9 @@ async function plFetch(url) {
       headers: { 'Authorization': 'Bearer ' + SUPABASE_KEY }
     });
     if (!res.ok) throw new Error(res.status);
-    return await res.json();
+    const data = await res.json();
+    plCache[url] = { data, ts: Date.now() };
+    return data;
   } catch(e) {
     console.warn('API unavailable:', e.message);
     return null;
@@ -957,7 +965,7 @@ async function saveMyPredictions(gw,preds) {
 }
 
 async function syncResultsToSupabase(gw, liveMatches) {
-  if (!gw) return;
+  if (!gw || !liveMatches?.length) return;
   const finished = liveMatches.filter(m=>m.status==='FINISHED');
   if(!finished.length) return;
   const rows = finished.map(m=>{
