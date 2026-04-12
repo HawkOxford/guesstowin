@@ -532,12 +532,9 @@ function switchTab(tab,btn) {
   if(tab==='scores' && !currentUser) fetchAndRenderFixturesGuest();
 }
 
-// Auto-refresh leaderboard every 60s during live weekend
+// Auto-refresh leaderboard every 60s during live weekend regardless of active tab
 setInterval(() => {
-  const lb = document.getElementById('tab-leaderboard');
-  if (lb && lb.classList.contains('active') && deadlinePassed) {
-    renderLeaderboard();
-  }
+  if (deadlinePassed) renderLeaderboard();
 }, 60000);
 
 // ── Scoring logic ─────────────────────────────────────────────────────────────
@@ -554,7 +551,7 @@ function calcPoints(predH, predA, actH, actA) {
 async function renderLeaderboard() {
   const section = document.getElementById('leaderboard-section');
 
-  // Load all data in parallel
+  // Load all Supabase data + live predictions for current GW in parallel
   const [{data: results},{data: allPreds},{data: allProfiles}] = await Promise.all([
     sb.from('results').select('gameweek,match_key,home_score,away_score,status').eq('status','finished'),
     sb.from('predictions').select('user_id,gameweek,match_key,home_score,away_score'),
@@ -563,9 +560,9 @@ async function renderLeaderboard() {
   const profileMap={};
   (allProfiles||[]).forEach(p=>{ profileMap[p.id]=p.player_name; });
 
-  // Build points per player per GW from Supabase
-  const gwPoints = {}; // { playerName: { gw: pts } }
-  const gwWinners = {}; // { gw: [names] }
+  // Build points per player per GW from Supabase results
+  const gwPoints = {};
+  const gwWinners = {};
 
   if(results && allPreds) {
     const resultMap = {};
@@ -576,13 +573,12 @@ async function renderLeaderboard() {
       if(!name) return;
       const r = resultMap[`${p.gameweek}_${p.match_key}`];
       if(!r) return;
-      const pts = calcPoints(p.home_score, p.away_score, r.home_score, r.away_score);
+      const pts = calcPoints(p.home_score??0, p.away_score??0, r.home_score, r.away_score);
       if(pts===null) return;
       if(!gwPoints[name]) gwPoints[name]={};
       gwPoints[name][p.gameweek] = (gwPoints[name][p.gameweek]||0) + pts;
     });
 
-    // Find weekly winners
     const gws = [...new Set(results.map(r=>r.gameweek))];
     gws.forEach(gw => {
       const scores = PLAYERS.map(n=>({name:n,pts:gwPoints[n]?.[gw]||0}));
@@ -591,34 +587,21 @@ async function renderLeaderboard() {
     });
   }
 
-  // Calculate total points = base + supabase GWs
-  const totals = PLAYERS.map(name => {
-    const supabasePts = Object.values(gwPoints[name]||{}).reduce((a,b)=>a+b,0);
-    const total = BASE_SCORES[name] + supabasePts;
-
-    // Weekly prize money from new GWs
-    let extraPrize = 0;
-    Object.entries(gwWinners).forEach(([gw,winners]) => {
-      if(winners.includes(name)) extraPrize += 10/winners.length;
+  // Overlay live results for current GW — calculate from liveResults + predictions
+  // This runs whether or not results have been written to Supabase yet
+  if (currentGW && deadlinePassed && Object.keys(liveResults).length) {
+    // Build prediction map from allPreds for current GW
+    const livePredMap = {};
+    (allPreds||[]).filter(p=>p.gameweek===currentGW).forEach(p => {
+      const name = profileMap[p.user_id];
+      if (!name) return;
+      if (!livePredMap[name]) livePredMap[name] = {};
+      const key = p.match_key.replace(/^\d+_/, '');
+      livePredMap[name][key] = {home: p.home_score??0, away: p.away_score??0};
     });
 
-    return { name, total, weekly: BASE_WEEKLY_PRIZE[name] + extraPrize };
-  }).sort((a,b)=>b.total-a.total);
-
-  // Assign ranks (tied players share rank)
-  let rank=1;
-  for(let i=0;i<totals.length;i++){
-    if(i>0 && totals[i].total===totals[i-1].total) totals[i].rank=totals[i-1].rank;
-    else totals[i].rank=rank;
-    rank++;
-  }
-
-  const rankClass = r => r===1?'top-1':r===2?'top-2':r===3?'top-3':'';
-
-  // Overlay live results onto gwPoints for current GW
-  if (currentGW && deadlinePassed && Object.keys(liveResults).length) {
     PLAYERS.forEach(name => {
-      const preds = allPredictions[name] || {};
+      const preds = livePredMap[name] || {};
       let livePts = 0;
       Object.keys(liveResults).forEach(key => {
         const res = liveResults[key];
@@ -628,14 +611,41 @@ async function renderLeaderboard() {
           if (pts !== null) livePts += pts;
         }
       });
-      // Only use live pts if greater than what Supabase has (Supabase may have partial results)
       if (!gwPoints[name]) gwPoints[name] = {};
-      const supabasePts = gwPoints[name][currentGW] || 0;
-      if (livePts > supabasePts) gwPoints[name][currentGW] = livePts;
+      // Use whichever is higher — Supabase stored or live calculated
+      if (livePts >= (gwPoints[name][currentGW]||0)) {
+        gwPoints[name][currentGW] = livePts;
+      }
     });
+
+    // Recalculate GW winner with live data
+    const liveScores = PLAYERS.map(n=>({name:n,pts:gwPoints[n]?.[currentGW]||0}));
+    const liveMax = Math.max(...liveScores.map(s=>s.pts));
+    if(liveMax>0) gwWinners[currentGW] = liveScores.filter(s=>s.pts===liveMax).map(s=>s.name);
   }
 
-  // Find current GW weekly leader (only show trophy if deadline passed)
+  // Calculate totals AFTER live overlay is applied
+  const totals = PLAYERS.map(name => {
+    const supabasePts = Object.values(gwPoints[name]||{}).reduce((a,b)=>a+b,0);
+    const total = BASE_SCORES[name] + supabasePts;
+    let extraPrize = 0;
+    Object.entries(gwWinners).forEach(([gw,winners]) => {
+      if(winners.includes(name)) extraPrize += 10/winners.length;
+    });
+    return { name, total, weekly: BASE_WEEKLY_PRIZE[name] + extraPrize };
+  }).sort((a,b)=>b.total-a.total);
+
+  // Assign ranks
+  let rank=1;
+  for(let i=0;i<totals.length;i++){
+    if(i>0 && totals[i].total===totals[i-1].total) totals[i].rank=totals[i-1].rank;
+    else totals[i].rank=rank;
+    rank++;
+  }
+
+  const rankClass = r => r===1?'top-1':r===2?'top-2':r===3?'top-3':'';
+
+  // GW leader
   let gwLeaders = [];
   if(currentGW) {
     const gwScores = PLAYERS.map(n => ({name:n, pts: gwPoints[n]?.[currentGW]||0}));
