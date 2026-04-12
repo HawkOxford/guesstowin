@@ -532,6 +532,14 @@ function switchTab(tab,btn) {
   if(tab==='scores' && !currentUser) fetchAndRenderFixturesGuest();
 }
 
+// Auto-refresh leaderboard every 60s during live weekend
+setInterval(() => {
+  const lb = document.getElementById('tab-leaderboard');
+  if (lb && lb.classList.contains('active') && deadlinePassed) {
+    renderLeaderboard();
+  }
+}, 60000);
+
 // ── Scoring logic ─────────────────────────────────────────────────────────────
 function calcPoints(predH, predA, actH, actA) {
   if(predH===undefined||predA===undefined||actH===null||actA===null) return null;
@@ -606,6 +614,26 @@ async function renderLeaderboard() {
   }
 
   const rankClass = r => r===1?'top-1':r===2?'top-2':r===3?'top-3':'';
+
+  // Overlay live results onto gwPoints for current GW
+  if (currentGW && deadlinePassed && Object.keys(liveResults).length) {
+    PLAYERS.forEach(name => {
+      const preds = allPredictions[name] || {};
+      let livePts = 0;
+      Object.keys(liveResults).forEach(key => {
+        const res = liveResults[key];
+        const pred = preds[key];
+        if (pred && res && res.home !== null) {
+          const pts = calcPoints(pred.home, pred.away, res.home, res.away);
+          if (pts !== null) livePts += pts;
+        }
+      });
+      // Only use live pts if greater than what Supabase has (Supabase may have partial results)
+      if (!gwPoints[name]) gwPoints[name] = {};
+      const supabasePts = gwPoints[name][currentGW] || 0;
+      if (livePts > supabasePts) gwPoints[name][currentGW] = livePts;
+    });
+  }
 
   // Find current GW weekly leader (only show trophy if deadline passed)
   let gwLeaders = [];
