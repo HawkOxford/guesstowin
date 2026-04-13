@@ -312,6 +312,7 @@ let allPredictions = {};
 let liveResults = {};
 let deadlinePassed = false;
 let refreshTimer = null;
+let simulationActive = false;
 
 // ── Auth ──────────────────────────────────────────────────────────────────────
 function showError(msg) { const e=document.getElementById('auth-error'); e.textContent=msg; e.style.display='block'; document.getElementById('auth-success').style.display='none'; }
@@ -382,10 +383,10 @@ async function fetchAndRenderFixturesGuest() {
 
   const deadline = currentMatches.map(m=>new Date(m.utcDate)).sort((a,b)=>a-b)[0];
   const now = new Date();
-  deadlinePassed = now >= deadline;
+  if (!simulationActive) deadlinePassed = now >= deadline;
 
   let liveMatches = [];
-  if (deadlinePassed) {
+  if (deadlinePassed && !simulationActive) {
     liveMatches = await fetchLiveMatches();
     buildLiveResults(liveMatches);
     allPredictions = await loadAllPredictions(currentGW);
@@ -571,19 +572,19 @@ async function renderLeaderboard() {
     });
   }
 
-  // Overlay live results for current GW — calculate from liveResults + predictions
-  // Active from first kickoff to 2hrs after last kickoff, regardless of deadlinePassed state
+  // Overlay live results for current GW
+  // Fetch fresh live data if in live window, don't rely on global liveResults state
   const now = Date.now();
-  const matchTimes = (allPreds||[])
-    .filter(p => p.gameweek === currentGW && p.utcDate)
-    .map(p => new Date(p.utcDate).getTime());
-  // Fall back to currentMatches for timing if available
-  const kickoffTimes = currentMatches.length
-    ? currentMatches.map(m => new Date(m.utcDate).getTime())
-    : matchTimes;
+  const kickoffTimes = currentMatches.map(m => new Date(m.utcDate).getTime());
   const firstKickoff = kickoffTimes.length ? Math.min(...kickoffTimes) : null;
   const lastKickoff = kickoffTimes.length ? Math.max(...kickoffTimes) : null;
   const isLiveWindow = firstKickoff && now >= firstKickoff && now <= lastKickoff + 2 * 60 * 60 * 1000;
+
+  if (currentGW && (deadlinePassed || isLiveWindow)) {
+    // Always fetch fresh live data for the overlay — don't trust global state
+    const freshLive = await fetchLiveMatches();
+    if (freshLive && freshLive.length) buildLiveResults(freshLive);
+  }
 
   if (currentGW && (deadlinePassed || isLiveWindow) && Object.keys(liveResults).length) {
     // Build prediction map from allPreds for current GW
@@ -754,6 +755,7 @@ const plCache = {}; // simple in-memory cache
 const CACHE_TTL = 45000; // 45 seconds
 
 async function plFetch(url) {
+  if (simulationActive) return null;
   const now = Date.now();
   if (plCache[url] && now - plCache[url].ts < CACHE_TTL) {
     return plCache[url].data;
@@ -1074,11 +1076,11 @@ async function fetchAndRenderFixtures(targetGW) {
     // Deadline = first kick-off of the gameweek
     const deadline = currentMatches.map(m=>new Date(m.utcDate)).sort((a,b)=>a-b)[0];
     const now = new Date();
-    deadlinePassed = now >= deadline;
+    if (!simulationActive) deadlinePassed = now >= deadline;
 
     // Always fetch live scores once deadline has passed
     let liveMatches = [];
-    if (deadlinePassed) {
+    if (deadlinePassed && !simulationActive) {
       liveMatches = await fetchLiveMatches();
       await syncResultsToSupabase(currentGW, liveMatches);
       buildLiveResults(liveMatches);
@@ -1723,27 +1725,47 @@ sb.auth.onAuthStateChange((event,session)=>{if(event==='SIGNED_IN'&&session?.use
 // ── Debug helper (console only) ───────────────────────────────────────────────
 // Run simulateLive() in console to test live gameweek UI without real matches
 window.simulateLive = async function() {
+  simulationActive = true;
   deadlinePassed = true;
   liveResults = {};
-  // Build fake live results from whatever currentMatches contains
+
+  // Build fake live results from currentMatches
   const statuses = ['FINISHED','FINISHED','IN_PLAY','PAUSED','TIMED','TIMED','TIMED','TIMED','TIMED'];
   currentMatches.forEach((m, i) => {
     const home = cleanTeamName(m.homeTeam?.name) || 'Home';
     const away = cleanTeamName(m.awayTeam?.name) || 'Away';
     const key = home + '_' + away;
     const status = statuses[i] || 'TIMED';
-    const hasScore = status === 'FINISHED' || status === 'IN_PLAY' || status === 'PAUSED';
+    const hasScore = ['FINISHED','IN_PLAY','PAUSED'].includes(status);
     liveResults[key] = {
       home: hasScore ? Math.floor(Math.random()*3) : null,
       away: hasScore ? Math.floor(Math.random()*3) : null,
       status
     };
   });
-  // Load all predictions so leaderboard overlay has data to work with
+
+  // Load all predictions fresh from Supabase
   allPredictions = await loadAllPredictions(currentGW);
+
+  // Re-render both tabs — API fetches are now blocked so fake data stays
   await fetchAndRenderFixtures(currentGW);
   await renderLeaderboard();
-  console.log('Live simulation active with', Object.keys(liveResults).length, 'matches and', Object.keys(allPredictions).length, 'players with predictions — check Scores and Leaderboard tabs');
+
+  console.log(
+    'Simulation active — API fetches blocked.\n' +
+    'Matches:', Object.keys(liveResults).length,
+    '| Players with predictions:', Object.keys(allPredictions).length,
+    '\nRun simulateStop() to exit.'
+  );
+};
+
+window.simulateStop = function() {
+  simulationActive = false;
+  deadlinePassed = false;
+  liveResults = {};
+  allPredictions = {};
+  location.reload();
+  console.log('Simulation stopped — reloading page.');
 };
 
 // Run sync immediately on load then every 60s
