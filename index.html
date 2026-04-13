@@ -246,6 +246,7 @@
     <div class="tabs">
       <button class="tab-btn active" onclick="switchTab('scores',this)">⚽ Scores</button>
       <button class="tab-btn" onclick="switchTab('leaderboard',this)">🏆 Leaderboard</button>
+      <button class="tab-btn" id="admin-tab-btn" onclick="switchTab('admin',this)" style="display:none">⚙ Admin</button>
     </div>
   </header>
 
@@ -273,6 +274,21 @@
       <div class="rules-callout" style="margin-top:1.5rem">
         <strong>Rules:</strong> Submit before the first game kicks off. No changes after kick-off.
         Correct result = <strong>1pt</strong> · Correct score = <strong>3pts</strong> · Cost: <strong>£2/week</strong>
+      </div>
+    </div>
+  </div>
+
+  <!-- Admin Tab -->
+  <div id="tab-admin" class="tab-content">
+    <div class="main">
+      <div id="admin-pin-screen" style="max-width:300px;margin:2rem auto;text-align:center">
+        <div style="font-size:0.62rem;font-weight:700;letter-spacing:0.2em;text-transform:uppercase;color:var(--green);margin-bottom:1rem">Admin Access</div>
+        <input id="admin-pin-input" type="password" class="auth-input" placeholder="Enter PIN" onkeydown="if(event.key==='Enter')checkAdminPin()" style="text-align:center;letter-spacing:0.3em">
+        <button class="auth-btn" onclick="checkAdminPin()">Unlock</button>
+        <div id="admin-pin-error" style="color:var(--red);font-size:0.75rem;margin-top:0.5rem;display:none">Incorrect PIN</div>
+      </div>
+      <div id="admin-content" style="display:none">
+        <div id="admin-section"></div>
       </div>
     </div>
   </div>
@@ -505,6 +521,9 @@ async function loadApp(user) {
   document.getElementById('app-screen').style.display='block';
   document.getElementById('user-name-display').textContent=currentPlayerName;
   viewingGW = null; // reset on login
+  // Show admin tab only for Jake
+  const adminBtn = document.getElementById('admin-tab-btn');
+  if (adminBtn) adminBtn.style.display = currentPlayerName === 'Jake' ? '' : 'none';
   warmCrestCache();
   fetchAndRenderFixtures();
   renderLeaderboard();
@@ -518,6 +537,13 @@ function switchTab(tab,btn) {
   btn.classList.add('active');
   if(tab==='leaderboard') renderLeaderboard();
   if(tab==='scores' && !currentUser) fetchAndRenderFixturesGuest();
+  if(tab==='admin') {
+    // Reset pin screen each time tab is opened
+    document.getElementById('admin-pin-screen').style.display = '';
+    document.getElementById('admin-content').style.display = 'none';
+    document.getElementById('admin-pin-input').value = '';
+    document.getElementById('admin-pin-error').style.display = 'none';
+  }
 }
 
 // Auto-refresh leaderboard every 60s during live weekend regardless of active tab
@@ -1735,6 +1761,179 @@ function startCountdown(deadline) {
   }
   update();
   countdownTimer = setInterval(update, 1000);
+}
+
+// ── Admin ─────────────────────────────────────────────────────────────────────
+const ADMIN_PIN = 'hawk1993';
+let adminUnlocked = false;
+
+function checkAdminPin() {
+  const val = document.getElementById('admin-pin-input').value;
+  if (val === ADMIN_PIN) {
+    adminUnlocked = true;
+    document.getElementById('admin-pin-screen').style.display = 'none';
+    document.getElementById('admin-content').style.display = '';
+    renderAdmin();
+  } else {
+    document.getElementById('admin-pin-error').style.display = '';
+  }
+}
+
+async function renderAdmin() {
+  const section = document.getElementById('admin-section');
+  section.innerHTML = '<div class="state-box"><div class="spinner"></div><div>Loading admin data…</div></div>';
+
+  // Load all data in parallel
+  const [
+    { data: profiles },
+    { data: preds },
+    { data: results }
+  ] = await Promise.all([
+    sb.from('profiles').select('id,player_name'),
+    sb.from('predictions').select('user_id,gameweek,match_key,home_score,away_score'),
+    sb.from('results').select('gameweek,match_key,home_score,away_score,status').eq('status','finished')
+  ]);
+
+  const profileMap = {};
+  (profiles||[]).forEach(p => profileMap[p.id] = p.player_name);
+
+  // Get all GWs
+  const allGWs = [...new Set([
+    ...(preds||[]).map(p => p.gameweek),
+    ...(results||[]).map(r => r.gameweek)
+  ])].sort((a,b) => a-b);
+
+  // Live results comparison
+  const liveMatchData = Object.keys(liveResults).length ? liveResults : null;
+
+  // Build results map
+  const resultMap = {};
+  (results||[]).forEach(r => {
+    const key = r.match_key.replace(/^\d+_/, '');
+    resultMap[`${r.gameweek}_${key}`] = r;
+  });
+
+  // Build points per player per GW
+  const gwPoints = {};
+  (preds||[]).forEach(p => {
+    const name = profileMap[p.user_id];
+    if (!name || !PLAYERS.includes(name)) return;
+    const key = p.match_key.replace(/^\d+_/, '');
+    const r = resultMap[`${p.gameweek}_${key}`];
+    if (!r) return;
+    const pts = calcPoints(p.home_score??0, p.away_score??0, r.home_score, r.away_score);
+    if (pts === null) return;
+    if (!gwPoints[name]) gwPoints[name] = {};
+    gwPoints[name][p.gameweek] = (gwPoints[name][p.gameweek]||0) + pts;
+  });
+
+  // Submission counts per GW
+  const subMap = {};
+  (preds||[]).forEach(p => {
+    const name = profileMap[p.user_id];
+    if (!name || !PLAYERS.includes(name)) return;
+    if (!subMap[p.gameweek]) subMap[p.gameweek] = {};
+    subMap[p.gameweek][name] = (subMap[p.gameweek][name]||0) + 1;
+  });
+
+  const fixtureCount = currentMatches.length || 8;
+
+  section.innerHTML = `
+    <div class="section-label">GW Status</div>
+    <div style="background:var(--card);border:1px solid var(--border);border-radius:8px;padding:1rem;margin-bottom:1.5rem;font-size:0.8rem;display:flex;gap:2rem;flex-wrap:wrap">
+      <div><span style="color:var(--muted)">Current GW</span><br><strong style="font-size:1.2rem;font-family:'Bebas Neue',sans-serif;color:var(--green)">${currentGW||'—'}</strong></div>
+      <div><span style="color:var(--muted)">Fixtures loaded</span><br><strong style="font-size:1.2rem;font-family:'Bebas Neue',sans-serif;color:var(--green)">${currentMatches.length}</strong></div>
+      <div><span style="color:var(--muted)">Deadline passed</span><br><strong style="font-size:1.2rem;font-family:'Bebas Neue',sans-serif;color:${deadlinePassed?'var(--green)':'var(--amber)'}">${deadlinePassed?'Yes':'No'}</strong></div>
+      <div><span style="color:var(--muted)">Live results cached</span><br><strong style="font-size:1.2rem;font-family:'Bebas Neue',sans-serif;color:var(--green)">${Object.keys(liveResults).length}</strong></div>
+    </div>
+
+    <div class="section-label">Manual Controls</div>
+    <div style="display:flex;gap:0.75rem;flex-wrap:wrap;margin-bottom:1.5rem">
+      <button class="btn-save" onclick="adminSync()" style="padding:0.5rem 1.2rem;font-size:0.8rem">↻ Sync live results now</button>
+      <button class="btn-save" onclick="renderAdmin()" style="padding:0.5rem 1.2rem;font-size:0.8rem;background:var(--bg3);color:var(--text)">↻ Refresh admin</button>
+    </div>
+    <div id="admin-sync-msg" style="font-size:0.75rem;color:var(--green);margin-bottom:1rem;display:none">✓ Sync triggered</div>
+
+    ${currentGW ? `
+    <div class="section-label">GW${currentGW} Submissions</div>
+    <div style="background:var(--card);border:1px solid var(--border);border-radius:8px;overflow:hidden;margin-bottom:1.5rem">
+      ${PLAYERS.map(name => {
+        const count = subMap[currentGW]?.[name] || 0;
+        const complete = count >= fixtureCount;
+        const partial = count > 0 && !complete;
+        return `<div style="display:flex;justify-content:space-between;align-items:center;padding:0.6rem 1rem;border-bottom:1px solid rgba(31,46,31,0.4)">
+          <span style="font-size:0.85rem;font-weight:500">${name}</span>
+          <span style="font-size:0.65rem;font-weight:700;border-radius:3px;padding:2px 7px;${complete?'background:rgba(0,230,118,0.12);color:var(--green)':partial?'background:rgba(255,167,38,0.1);color:var(--amber)':'background:rgba(239,83,80,0.1);color:var(--red)'}">
+            ${complete?'✓ '+count+'/'+fixtureCount:partial?'⚠ '+count+'/'+fixtureCount:'✗ None'}
+          </span>
+        </div>`;
+      }).join('')}
+    </div>` : ''}
+
+    ${liveMatchData ? `
+    <div class="section-label">Live vs Supabase Results (GW${currentGW})</div>
+    <div style="background:var(--card);border:1px solid var(--border);border-radius:8px;overflow:hidden;margin-bottom:1.5rem;font-size:0.78rem">
+      <div style="display:grid;grid-template-columns:1fr auto auto auto;gap:0.5rem;padding:0.5rem 1rem;border-bottom:1px solid var(--border);color:var(--muted);font-size:0.65rem;font-weight:700;text-transform:uppercase;letter-spacing:0.08em">
+        <span>Match</span><span>Live</span><span>Supabase</span><span>Status</span>
+      </div>
+      ${Object.keys(liveMatchData).map(key => {
+        const live = liveMatchData[key];
+        const stored = resultMap[`${currentGW}_${key}`];
+        const liveScore = live.home !== null ? `${live.home}–${live.away}` : '–';
+        const storedScore = stored ? `${stored.home_score}–${stored.away_score}` : 'Not written';
+        const match = stored && live.home !== null && stored.home_score === live.home && stored.away_score === live.away;
+        const statusCol = live.status === 'FINISHED'
+          ? (match ? '<span style="color:var(--green)">✓ Match</span>' : '<span style="color:var(--amber)">⚠ Mismatch</span>')
+          : `<span style="color:var(--muted)">${live.status}</span>`;
+        return `<div style="display:grid;grid-template-columns:1fr auto auto auto;gap:0.5rem;padding:0.5rem 1rem;border-bottom:1px solid rgba(31,46,31,0.3);align-items:center">
+          <span style="font-size:0.75rem">${key.replace('_',' v ')}</span>
+          <span style="font-family:'Bebas Neue',sans-serif">${liveScore}</span>
+          <span style="font-family:'Bebas Neue',sans-serif;color:${stored?'var(--text)':'var(--red)'}">${storedScore}</span>
+          ${statusCol}
+        </div>`;
+      }).join('')}
+    </div>` : `
+    <div class="section-label">Live vs Supabase Results</div>
+    <div style="background:var(--card);border:1px solid var(--border);border-radius:8px;padding:1rem;margin-bottom:1.5rem;font-size:0.78rem;color:var(--muted)">
+      No live data cached yet — available during the weekend when matches are in progress.
+    </div>`}
+
+    <div class="section-label">Points by Gameweek</div>
+    <div style="background:var(--card);border:1px solid var(--border);border-radius:8px;overflow:auto;margin-bottom:1.5rem">
+      <table style="width:100%;border-collapse:collapse;font-size:0.75rem;min-width:500px">
+        <thead>
+          <tr>
+            <th style="padding:0.5rem 1rem;text-align:left;color:var(--muted);font-size:0.65rem;letter-spacing:0.08em;text-transform:uppercase;border-bottom:1px solid var(--border)">Player</th>
+            ${allGWs.map(gw => `<th style="padding:0.5rem 0.75rem;text-align:center;color:var(--muted);font-size:0.65rem;letter-spacing:0.08em;text-transform:uppercase;border-bottom:1px solid var(--border)">GW${gw}</th>`).join('')}
+            <th style="padding:0.5rem 0.75rem;text-align:center;color:var(--green);font-size:0.65rem;letter-spacing:0.08em;text-transform:uppercase;border-bottom:1px solid var(--border)">Base</th>
+            <th style="padding:0.5rem 0.75rem;text-align:center;color:var(--green);font-size:0.65rem;letter-spacing:0.08em;text-transform:uppercase;border-bottom:1px solid var(--border)">Total</th>
+          </tr>
+        </thead>
+        <tbody>
+          ${PLAYERS.map(name => {
+            const gwPts = gwPoints[name] || {};
+            const supabasePts = Object.values(gwPts).reduce((a,b)=>a+b,0);
+            const total = BASE_SCORES[name] + supabasePts;
+            return `<tr>
+              <td style="padding:0.5rem 1rem;font-weight:500;border-bottom:1px solid rgba(31,46,31,0.3)">${name}</td>
+              ${allGWs.map(gw => `<td style="padding:0.5rem 0.75rem;text-align:center;border-bottom:1px solid rgba(31,46,31,0.3);color:${gwPts[gw]?'var(--green)':'var(--muted)'}">${gwPts[gw]??'–'}</td>`).join('')}
+              <td style="padding:0.5rem 0.75rem;text-align:center;border-bottom:1px solid rgba(31,46,31,0.3);color:var(--muted)">${BASE_SCORES[name]}</td>
+              <td style="padding:0.5rem 0.75rem;text-align:center;border-bottom:1px solid rgba(31,46,31,0.3);font-family:'Bebas Neue',sans-serif;font-size:1.1rem;color:var(--green)">${total}</td>
+            </tr>`;
+          }).join('')}
+        </tbody>
+      </table>
+    </div>
+  `;
+}
+
+async function adminSync() {
+  document.getElementById('admin-sync-msg').style.display = '';
+  await syncLiveResults();
+  setTimeout(() => {
+    document.getElementById('admin-sync-msg').style.display = 'none';
+    renderAdmin();
+  }, 3000);
 }
 
 // ── Boot ──────────────────────────────────────────────────────────────────────
