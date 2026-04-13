@@ -1696,6 +1696,17 @@ function startCountdown(deadline) {
 // ── Boot ──────────────────────────────────────────────────────────────────────
 sb.auth.getSession().then(({data:{session}})=>{if(session?.user)loadApp(session.user);});
 sb.auth.onAuthStateChange((event,session)=>{if(event==='SIGNED_IN'&&session?.user)loadApp(session.user);});
+
+// Independent sync — runs every 60s regardless of deadline state
+// Fetches live matches and writes any FINISHED results to Supabase
+setInterval(async () => {
+  if (!currentUser || !currentGW) return;
+  const live = await fetchLiveMatches();
+  if (live && live.length) {
+    buildLiveResults(live);
+    await syncResultsToSupabase(currentGW, live);
+  }
+}, 60000);
 </script>
 </body>
 </html>
