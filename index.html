@@ -1767,8 +1767,8 @@ async function syncLiveResults() {
   const live = matches.filter(m => ['IN_PLAY','PAUSED','FINISHED'].includes(m.status));
   if (live.length) buildLiveResults(live);
 }
-}
 setInterval(syncLiveResults, 60000);
 </script>
 </body>
 </html>
+
