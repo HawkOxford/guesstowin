@@ -307,6 +307,17 @@ const BASE_WEEKLY_PRIZE = {
 };
 
 let currentUser = null;
+const crestCache = {}; // team name -> crest URL, built from API data
+
+async function warmCrestCache() {
+  if (Object.keys(crestCache).length > 10) return; // already warm
+  const data = await plFetch('https://api.football-data.org/v4/competitions/PL/teams');
+  if (!data?.teams) return;
+  data.teams.forEach(t => {
+    const name = cleanTeamName(t.name);
+    if (name && t.crest) crestCache[name] = t.crest;
+  });
+}
 let currentPlayerName = '';
 let currentGW = null;
 let viewingGW = null; // which GW the user is currently browsing
@@ -519,6 +530,7 @@ async function loadApp(user) {
   document.getElementById('app-screen').style.display='block';
   document.getElementById('user-name-display').textContent=currentPlayerName;
   viewingGW = null; // reset on login
+  warmCrestCache();
   fetchAndRenderFixtures();
   renderLeaderboard();
 }
@@ -1030,6 +1042,13 @@ async function fetchAndRenderFixtures(targetGW) {
       const day = ukWeekday(m.utcDate);
       return (day === 'Saturday' || day === 'Sunday') && (d === satStr || d === sunStr);
     });
+    // Cache crests for use in GW review
+    data.matches.forEach(m => {
+      const home = cleanTeamName(m.homeTeam?.name);
+      const away = cleanTeamName(m.awayTeam?.name);
+      if (home && m.homeTeam?.crest) crestCache[home] = m.homeTeam.crest;
+      if (away && m.awayTeam?.crest) crestCache[away] = m.awayTeam.crest;
+    });
   }
 
   // Fallback: use Supabase predictions as fixture source if API unavailable
@@ -1045,6 +1064,13 @@ async function fetchAndRenderFixtures(targetGW) {
   // Set currentMatches ONCE on first load
   if (!currentMatches.length) {
     currentMatches = weekend.sort((a,b) => new Date(a.utcDate) - new Date(b.utcDate));
+    // Build crest cache from match data
+    currentMatches.forEach(m => {
+      const home = cleanTeamName(m.homeTeam?.name);
+      const away = cleanTeamName(m.awayTeam?.name);
+      if (home && m.homeTeam?.crest) crestCache[home] = m.homeTeam.crest;
+      if (away && m.awayTeam?.crest) crestCache[away] = m.awayTeam.crest;
+    });
   }
 
   if (!viewingGW) viewingGW = currentGW;
@@ -1334,7 +1360,10 @@ async function renderGWView(gw) {
     </div>`;
     const card = document.createElement('div');
     card.className = cardClass;
-    card.innerHTML = `<div class="fixture-main"><div class="fixture-team home">${home}</div><div class="fixture-crest"></div>${scoreRow}<div class="fixture-crest"></div><div class="fixture-team away">${away}</div></div>${subRow}`;
+    // Look up crests from currentMatches or a global crest cache
+    const homeCrest = crestCache[home] ? `<img class="team-crest" src="${crestCache[home]}" alt="">` : '';
+    const awayCrest = crestCache[away] ? `<img class="team-crest" src="${crestCache[away]}" alt="">` : '';
+    card.innerHTML = `<div class="fixture-main"><div class="fixture-team home">${home}</div><div class="fixture-crest">${homeCrest}</div>${scoreRow}<div class="fixture-crest">${awayCrest}</div><div class="fixture-team away">${away}</div></div>${subRow}`;
     list.appendChild(card);
   });
 
@@ -1703,25 +1732,12 @@ setTimeout(syncLiveResults, 5000); // 5s after load to let auth settle
 // Independent sync — runs every 60s regardless of deadline state
 // Fetches live matches and writes any FINISHED results to Supabase
 async function syncLiveResults() {
-  if (!currentUser || !currentGW) return;
-  // Build date range: check last 2 weekends to catch any unsynced results
-  const now = new Date();
-  const twoWeeksAgo = new Date(now);
-  twoWeeksAgo.setDate(now.getDate() - 14);
-  const dateFrom = ukDateStr(twoWeeksAgo.toISOString()).slice(0,10);
-  const dateTo = ukDateStr(now.toISOString()).slice(0,10);
-  const data = await plFetch(
-    `https://api.football-data.org/v4/competitions/PL/matches?dateFrom=${dateFrom}&dateTo=${dateTo}`
-  );
-  const matches = data?.matches?.filter(m => {
-    const day = ukWeekday(m.utcDate);
-    return day === 'Saturday' || day === 'Sunday';
-  }) || [];
-  if (matches.length) {
-    const finished = matches.filter(m => m.status === 'FINISHED');
-    if (finished.length) await syncResultsToSupabase(currentGW, finished);
-    const live = matches.filter(m => m.status === 'IN_PLAY' || m.status === 'PAUSED' || m.status === 'FINISHED');
-    if (live.length) buildLiveResults(live);
+  if (!currentUser || !currentGW || !currentMatches.length) return;
+  // Only sync results for the actual current weekend — use currentMatches dates
+  const live = await fetchLiveMatches();
+  if (live && live.length) {
+    buildLiveResults(live);
+    await syncResultsToSupabase(currentGW, live);
   }
 }
 setInterval(syncLiveResults, 60000);
