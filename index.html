@@ -1712,19 +1712,24 @@ sb.auth.onAuthStateChange((event,session)=>{if(event==='SIGNED_IN'&&session?.use
 // Run simulateLive() in console to test live gameweek UI without real matches
 window.simulateLive = function() {
   deadlinePassed = true;
-  liveResults = {
-    'Arsenal_Bournemouth':   {home:1,away:0,status:'IN_PLAY'},
-    'Brentford_Everton':     {home:2,away:1,status:'FINISHED'},
-    'Burnley_Brighton':      {home:0,away:2,status:'FINISHED'},
-    'Liverpool_Fulham':      {home:2,away:0,status:'PAUSED'},
-    'Sunderland_Spurs':      {home:1,away:0,status:'TIMED'},
-    'Crystal Palace_Newcastle': {home:null,away:null,status:'TIMED'},
-    "Nott'm Forest_Aston Villa":{home:null,away:null,status:'TIMED'},
-    'Chelsea_Man City':      {home:null,away:null,status:'TIMED'}
-  };
+  liveResults = {};
+  // Build fake live results from whatever currentMatches contains
+  const statuses = ['FINISHED','FINISHED','IN_PLAY','PAUSED','TIMED','TIMED','TIMED','TIMED','TIMED'];
+  currentMatches.forEach((m, i) => {
+    const home = cleanTeamName(m.homeTeam?.name) || 'Home';
+    const away = cleanTeamName(m.awayTeam?.name) || 'Away';
+    const key = home + '_' + away;
+    const status = statuses[i] || 'TIMED';
+    const hasScore = status === 'FINISHED' || status === 'IN_PLAY' || status === 'PAUSED';
+    liveResults[key] = {
+      home: hasScore ? Math.floor(Math.random()*3) : null,
+      away: hasScore ? Math.floor(Math.random()*3) : null,
+      status
+    };
+  });
   fetchAndRenderFixtures(currentGW);
   renderLeaderboard();
-  console.log('Live simulation active — check Scores and Leaderboard tabs');
+  console.log('Live simulation active with', Object.keys(liveResults).length, 'matches — check Scores and Leaderboard tabs');
 };
 
 // Run sync immediately on load then every 60s
