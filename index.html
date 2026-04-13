@@ -1258,7 +1258,7 @@ async function renderGWView(gw) {
   // Past GW review
   const [{data:results},{data:preds},{data:profiles}] = await Promise.all([
     sb.from('results').select('*').eq('gameweek', gw),
-    sb.from('predictions').select('user_id,match_key,home_score,away_score').eq('gameweek', gw),
+    sb.from('predictions').select('user_id,match_key,home_score,away_score,updated_at').eq('gameweek', gw),
     sb.from('profiles').select('id,player_name')
   ]);
 
@@ -1284,6 +1284,13 @@ async function renderGWView(gw) {
     const key = r.match_key.replace(/^\d+_/, '');
     resultMap[key] = {home: r.home_score, away: r.away_score, status: r.status};
   });
+
+  // Get date range from predictions updated_at (proxy for when matches were played)
+  const predDates = (preds||[]).map(p => p.updated_at).filter(Boolean).sort();
+  const gwDateLabel = predDates.length ? (() => {
+    const d = new Date(predDates[0]);
+    return d.toLocaleDateString('en-GB', {timeZone:'Europe/London', day:'numeric', month:'short', year:'numeric'});
+  })() : '';
 
   // Calculate GW points per player
   const gwScores = PLAYERS.map(name => {
@@ -1325,7 +1332,7 @@ async function renderGWView(gw) {
     <div class="gw-nav">${gwNavButtons(gw)}</div>
     <div class="gw-header" style="margin-bottom:1rem">
       <div>
-        <div class="gw-title">Gameweek ${gw} Review</div>
+        <div class="gw-title">Gameweek ${gw} Review <span style="font-size:0.75rem;color:var(--muted);font-family:'DM Sans',sans-serif;font-weight:400">${gwDateLabel}</span></div>
         <div class="gw-date">Completed</div>
       </div>
       <span class="deadline-pill ok">✓ Complete</span>
