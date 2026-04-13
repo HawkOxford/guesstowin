@@ -1258,7 +1258,7 @@ async function renderGWView(gw) {
   // Past GW review
   const [{data:results},{data:preds},{data:profiles}] = await Promise.all([
     sb.from('results').select('*').eq('gameweek', gw),
-    sb.from('predictions').select('user_id,match_key,home_score,away_score,updated_at').eq('gameweek', gw),
+    sb.from('predictions').select('user_id,match_key,home_score,away_score').eq('gameweek', gw),
     sb.from('profiles').select('id,player_name')
   ]);
 
@@ -1285,12 +1285,7 @@ async function renderGWView(gw) {
     resultMap[key] = {home: r.home_score, away: r.away_score, status: r.status};
   });
 
-  // Get date range from predictions updated_at (proxy for when matches were played)
-  const predDates = (preds||[]).map(p => p.updated_at).filter(Boolean).sort();
-  const gwDateLabel = predDates.length ? (() => {
-    const d = new Date(predDates[0]);
-    return d.toLocaleDateString('en-GB', {timeZone:'Europe/London', day:'numeric', month:'short', year:'numeric'});
-  })() : '';
+  const gwDateLabel = gw === 27 ? '11 / 12 Apr 2026' : '';
 
   // Calculate GW points per player
   const gwScores = PLAYERS.map(name => {
@@ -1780,4 +1775,3 @@ setInterval(syncLiveResults, 60000);
 </script>
 </body>
 </html>
-
