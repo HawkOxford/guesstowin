@@ -572,8 +572,20 @@ async function renderLeaderboard() {
   }
 
   // Overlay live results for current GW — calculate from liveResults + predictions
-  // This runs whether or not results have been written to Supabase yet
-  if (currentGW && deadlinePassed && Object.keys(liveResults).length) {
+  // Active from first kickoff to 2hrs after last kickoff, regardless of deadlinePassed state
+  const now = Date.now();
+  const matchTimes = (allPreds||[])
+    .filter(p => p.gameweek === currentGW && p.utcDate)
+    .map(p => new Date(p.utcDate).getTime());
+  // Fall back to currentMatches for timing if available
+  const kickoffTimes = currentMatches.length
+    ? currentMatches.map(m => new Date(m.utcDate).getTime())
+    : matchTimes;
+  const firstKickoff = kickoffTimes.length ? Math.min(...kickoffTimes) : null;
+  const lastKickoff = kickoffTimes.length ? Math.max(...kickoffTimes) : null;
+  const isLiveWindow = firstKickoff && now >= firstKickoff && now <= lastKickoff + 2 * 60 * 60 * 1000;
+
+  if (currentGW && (deadlinePassed || isLiveWindow) && Object.keys(liveResults).length) {
     // Build prediction map from allPreds for current GW
     const livePredMap = {};
     (allPreds||[]).filter(p=>p.gameweek===currentGW).forEach(p => {
@@ -1710,7 +1722,7 @@ sb.auth.onAuthStateChange((event,session)=>{if(event==='SIGNED_IN'&&session?.use
 
 // ── Debug helper (console only) ───────────────────────────────────────────────
 // Run simulateLive() in console to test live gameweek UI without real matches
-window.simulateLive = function() {
+window.simulateLive = async function() {
   deadlinePassed = true;
   liveResults = {};
   // Build fake live results from whatever currentMatches contains
@@ -1727,9 +1739,11 @@ window.simulateLive = function() {
       status
     };
   });
-  fetchAndRenderFixtures(currentGW);
-  renderLeaderboard();
-  console.log('Live simulation active with', Object.keys(liveResults).length, 'matches — check Scores and Leaderboard tabs');
+  // Load all predictions so leaderboard overlay has data to work with
+  allPredictions = await loadAllPredictions(currentGW);
+  await fetchAndRenderFixtures(currentGW);
+  await renderLeaderboard();
+  console.log('Live simulation active with', Object.keys(liveResults).length, 'matches and', Object.keys(allPredictions).length, 'players with predictions — check Scores and Leaderboard tabs');
 };
 
 // Run sync immediately on load then every 60s
@@ -1738,7 +1752,17 @@ setTimeout(syncLiveResults, 5000); // 5s after load to let auth settle
 // Independent sync — runs every 60s regardless of deadline state
 // Fetches live matches and writes any FINISHED results to Supabase
 async function syncLiveResults() {
-  if (!currentUser) return;
+  if (!currentUser || !currentGW) return;
+  // Only fetch live data during the live window (first kickoff to last kickoff + 2hrs)
+  // or if deadlinePassed is already true
+  if (!deadlinePassed && currentMatches.length) {
+    const now = Date.now();
+    const kickoffs = currentMatches.map(m => new Date(m.utcDate).getTime());
+    const firstKickoff = Math.min(...kickoffs);
+    const lastKickoff = Math.max(...kickoffs);
+    const inWindow = now >= firstKickoff && now <= lastKickoff + 2 * 60 * 60 * 1000;
+    if (!inWindow) return;
+  }
   // Fetch last 2 weekends to catch any unsynced results
   const now = new Date();
   const twoWeeksAgo = new Date(now);
