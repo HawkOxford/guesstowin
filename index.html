@@ -931,16 +931,9 @@ function formatMatchTime(utcDate) {
 async function estimateGWNumber(matches) {
   const BASE_GW = 26;
   try {
-    const [{ data: results }, { data: preds }] = await Promise.all([
-      sb.from('results').select('gameweek'),
-      sb.from('predictions').select('gameweek')
-    ]);
-    const completedGWs = new Set((results || []).map(r => r.gameweek)).size;
-    const highestPredGW = Math.max(0, ...((preds || []).map(p => p.gameweek)));
-    // Use whichever gives us the highest GW number
-    const fromResults = BASE_GW + completedGWs + 1;
-    const fromPreds = highestPredGW > BASE_GW ? highestPredGW + 1 : BASE_GW + 1;
-    return Math.max(fromResults, fromPreds);
+    const { data } = await sb.from('results').select('gameweek');
+    const completedGWs = new Set((data || []).map(r => r.gameweek)).size;
+    return BASE_GW + completedGWs + 1;
   } catch(e) {
     return BASE_GW + 1;
   }
@@ -1156,7 +1149,7 @@ function gwNavButtons(gw) {
 
   return `
     <button class="gw-nav-btn" ${prevGW < 27 ? 'disabled' : ''} onclick="navigateGW(${prevGW})">← GW${prevGW}</button>
-    <button class="gw-nav-btn" ${!nextGWAvailable ? 'disabled' : ''} onclick="navigateGW(${nextGW})">GW${nextGW} →</button>
+    <button class="gw-nav-btn" ${gw >= currentGW && !nextGWAvailable ? 'disabled' : gw >= currentGW + 1 ? 'disabled' : ''} onclick="navigateGW(${nextGW})">GW${nextGW} →</button>
   `;
 }
 
