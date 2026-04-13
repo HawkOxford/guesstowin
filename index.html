@@ -1697,16 +1697,34 @@ function startCountdown(deadline) {
 sb.auth.getSession().then(({data:{session}})=>{if(session?.user)loadApp(session.user);});
 sb.auth.onAuthStateChange((event,session)=>{if(event==='SIGNED_IN'&&session?.user)loadApp(session.user);});
 
+// Run sync immediately on load then every 60s
+setTimeout(syncLiveResults, 5000); // 5s after load to let auth settle
+
 // Independent sync — runs every 60s regardless of deadline state
 // Fetches live matches and writes any FINISHED results to Supabase
-setInterval(async () => {
+async function syncLiveResults() {
   if (!currentUser || !currentGW) return;
-  const live = await fetchLiveMatches();
-  if (live && live.length) {
-    buildLiveResults(live);
-    await syncResultsToSupabase(currentGW, live);
+  // Build date range: check last 2 weekends to catch any unsynced results
+  const now = new Date();
+  const twoWeeksAgo = new Date(now);
+  twoWeeksAgo.setDate(now.getDate() - 14);
+  const dateFrom = ukDateStr(twoWeeksAgo.toISOString()).slice(0,10);
+  const dateTo = ukDateStr(now.toISOString()).slice(0,10);
+  const data = await plFetch(
+    `https://api.football-data.org/v4/competitions/PL/matches?dateFrom=${dateFrom}&dateTo=${dateTo}`
+  );
+  const matches = data?.matches?.filter(m => {
+    const day = ukWeekday(m.utcDate);
+    return day === 'Saturday' || day === 'Sunday';
+  }) || [];
+  if (matches.length) {
+    const finished = matches.filter(m => m.status === 'FINISHED');
+    if (finished.length) await syncResultsToSupabase(currentGW, finished);
+    const live = matches.filter(m => m.status === 'IN_PLAY' || m.status === 'PAUSED' || m.status === 'FINISHED');
+    if (live.length) buildLiveResults(live);
   }
-}, 60000);
+}
+setInterval(syncLiveResults, 60000);
 </script>
 </body>
 </html>
