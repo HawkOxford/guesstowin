@@ -708,6 +708,8 @@ async function renderLeaderboard() {
     setTimeout(()=>{
       const ctx = document.getElementById('position-chart');
       if(!ctx||!window.Chart) return;
+      const existing = Chart.getChart(ctx);
+      if(existing) existing.destroy();
       new Chart(ctx, {
         type: 'line',
         data: {labels: gws.map(g=>'GW'+g), datasets},
@@ -1771,4 +1773,3 @@ setInterval(syncLiveResults, 60000);
 </script>
 </body>
 </html>
-
