@@ -501,6 +501,7 @@ async function signUp() {
 
 async function signOut() {
   if(refreshTimer) clearInterval(refreshTimer);
+  if(countdownTimer) clearInterval(countdownTimer);
   await sb.auth.signOut();
   document.getElementById('app-screen').style.display='none';
   document.getElementById('auth-screen').style.display='flex';
@@ -916,14 +917,18 @@ function formatMatchTime(utcDate) {
 }
 
 async function estimateGWNumber(matches) {
-  // The API uses 'matchday' which doesn't match our GW numbering.
-  // We know GW26 was the last completed round before we started tracking.
-  // Count distinct gameweeks already stored in Supabase results to get current GW.
   const BASE_GW = 26;
   try {
-    const { data } = await sb.from('results').select('gameweek');
-    const completedGWs = new Set((data || []).map(r => r.gameweek)).size;
-    return BASE_GW + completedGWs + 1;
+    const [{ data: results }, { data: preds }] = await Promise.all([
+      sb.from('results').select('gameweek'),
+      sb.from('predictions').select('gameweek')
+    ]);
+    const completedGWs = new Set((results || []).map(r => r.gameweek)).size;
+    const highestPredGW = Math.max(0, ...((preds || []).map(p => p.gameweek)));
+    // Use whichever gives us the highest GW number
+    const fromResults = BASE_GW + completedGWs + 1;
+    const fromPreds = highestPredGW > BASE_GW ? highestPredGW + 1 : BASE_GW + 1;
+    return Math.max(fromResults, fromPreds);
   } catch(e) {
     return BASE_GW + 1;
   }
@@ -1090,6 +1095,7 @@ async function fetchAndRenderFixtures(targetGW) {
 }
 
 function buildLiveResults(liveMatches) {
+  if (!liveMatches?.length) return; // don't wipe existing results if fetch failed
   liveResults={};
   liveMatches.forEach(m=>{
     const home=cleanTeamName(m.homeTeam?.name)||'Home';
