@@ -15,7 +15,6 @@
   .lock-title span { color:var(--green); }
   .pin { width:100%; background:#1a231a; border:1px solid var(--border); border-radius:6px; color:var(--text); font-size:0.95rem; padding:0.65rem; margin-bottom:0.6rem; outline:none; text-align:center; }
   .pin:focus { border-color:var(--green); }
-  .pin.code { letter-spacing:0.3em; font-size:1.1rem; }
   .lock-btn { width:100%; background:var(--green); color:#031a03; border:none; border-radius:6px; padding:0.75rem; font-weight:700; font-size:0.95rem; cursor:pointer; margin-top:0.4rem; }
   .lock-err { font-size:0.72rem; color:var(--red); margin-top:0.75rem; display:none; }
   .dash { padding:1.5rem; max-width:700px; margin:0 auto; }
@@ -66,7 +65,7 @@
       <div class="subtitle" id="subtitle">Loading…</div>
     </div>
     <div class="controls">
-      <select class="gw-select" id="gw-select" onchange="renderForGW(this.value)">
+      <select class="gw-select" id="gw-select" onchange="renderForGW(parseInt(this.value))">
         <option>Loading…</option>
       </select>
       <button class="refresh" onclick="load()">↻ Refresh</button>
@@ -78,6 +77,7 @@
 <script>
 const SUPABASE_URL = 'https://iufbdwsmbwrtcqzkvyey.supabase.co';
 const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Iml1ZmJkd3NtYndydGNxemt2eWV5Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzQ2MTg2MzcsImV4cCI6MjA5MDE5NDYzN30.Q3B-7qr4xWcGpa1UJWKSAd1iu6_-WHaiDcPV4HJ8SNk';
+const PROXY = 'https://iufbdwsmbwrtcqzkvyey.supabase.co/functions/v1/football-proxy';
 const sb = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 
 const PLAYERS = ['Jake','Glurk','Josh ⭐','Richard ⭐','Teflon','Alex','Gaz ⭐','Liam','Craig','Marcus'];
@@ -85,7 +85,7 @@ const PLAYERS = ['Jake','Glurk','Josh ⭐','Richard ⭐','Teflon','Alex','Gaz �
 let allPreds = [];
 let profileMap = {};
 let totalFixtures = 8;
-let availableGWs = [];
+let currentGW = 27;
 
 async function unlock() {
   const email = document.getElementById('admin-email').value.trim();
@@ -105,24 +105,28 @@ async function unlock() {
 async function load() {
   document.getElementById('content').innerHTML = '<div class="spinner"></div>';
 
-  const [{ data: profiles }, { data: preds }] = await Promise.all([
+  const [{ data: profiles }, { data: preds }, { data: results }] = await Promise.all([
     sb.from('profiles').select('id,player_name'),
-    sb.from('predictions').select('user_id,gameweek,match_key,home_score,away_score')
+    sb.from('predictions').select('user_id,gameweek,match_key,home_score,away_score'),
+    sb.from('results').select('gameweek,match_key').eq('status','finished')
   ]);
 
   profileMap = {};
   (profiles||[]).forEach(p => profileMap[p.id] = p.player_name);
   allPreds = preds || [];
 
-  // Get all GWs that have predictions, sorted descending
-  availableGWs = [...new Set(allPreds.map(p => p.gameweek))].sort((a,b) => b-a);
+  // Determine current GW from results table
+  const completedGWs = new Set((results||[]).map(r => r.gameweek));
+  currentGW = 26 + completedGWs.size + 1;
 
-  // Fetch fixture count from API
+  // Fixture count for current GW from API via Edge Function
   try {
-    const proxyUrl = 'https://corsproxy.io/?' + encodeURIComponent('https://api.football-data.org/v4/competitions/PL/matches?status=SCHEDULED,TIMED');
-    const apiRes = await fetch(proxyUrl, {headers:{'X-Auth-Token':'06f21e4fcbf44c9984aa595874172fa2'}});
-    if (apiRes.ok) {
-      const matches = (await apiRes.json()).matches || [];
+    const res = await fetch(PROXY + '?path=%2Fv4%2Fcompetitions%2FPL%2Fmatches&query=status%3DSCHEDULED%2CTIMED', {
+      headers: { 'Authorization': 'Bearer ' + SUPABASE_KEY }
+    });
+    if (res.ok) {
+      const data = await res.json();
+      const matches = data.matches || [];
       const now = new Date();
       const upcoming = matches.filter(m => {
         const d = new Date(m.utcDate);
@@ -139,90 +143,70 @@ async function load() {
         sunDate.setUTCDate(satDate.getUTCDate()+1);
         const satStr = satDate.toISOString().slice(0,10);
         const sunStr = sunDate.toISOString().slice(0,10);
-        const weekend = upcoming.filter(m => {
-          const d = m.utcDate.slice(0,10);
-          return d === satStr || d === sunStr;
-        });
+        const weekend = upcoming.filter(m => [satStr,sunStr].includes(m.utcDate.slice(0,10)));
         totalFixtures = weekend.length || 8;
       }
     }
   } catch(e) {}
 
-  // Build GW dropdown
+  // Build GW dropdown — show all GWs from 27 up to currentGW
   const sel = document.getElementById('gw-select');
   sel.innerHTML = '';
-  if (availableGWs.length) {
-    availableGWs.forEach(gw => {
-      const opt = document.createElement('option');
-      opt.value = gw;
-      opt.textContent = `GW${gw}`;
-      sel.appendChild(opt);
-    });
-    // Add current/upcoming GW if not already in list
-    const currentGW = availableGWs[0] + (availableGWs[0] === availableGWs[0] ? 0 : 1);
-    sel.value = availableGWs[0];
-  } else {
+  for (let gw = currentGW; gw >= 27; gw--) {
     const opt = document.createElement('option');
-    opt.value = 27;
-    opt.textContent = 'GW27';
+    opt.value = gw;
+    opt.textContent = `GW${gw}`;
     sel.appendChild(opt);
   }
+  sel.value = currentGW;
 
   const now = new Date();
-  document.getElementById('subtitle').textContent = now.toLocaleDateString('en-GB',{weekday:'short',day:'numeric',month:'short'}) + ' · ' + now.toLocaleTimeString('en-GB',{hour:'2-digit',minute:'2-digit'});
+  document.getElementById('subtitle').textContent =
+    now.toLocaleDateString('en-GB',{weekday:'short',day:'numeric',month:'short'}) + ' · ' +
+    now.toLocaleTimeString('en-GB',{hour:'2-digit',minute:'2-digit'}) + ' · GW' + currentGW + ' active';
 
-  renderForGW(sel.value);
+  renderForGW(currentGW);
 }
 
 function renderForGW(gw) {
   gw = parseInt(gw);
   const gwPreds = allPreds.filter(p => p.gameweek === gw);
 
-  // Count predictions per player for this GW
+  // Count unique players who have submitted — one entry per player
   const submissionMap = {};
   gwPreds.forEach(p => {
     const name = profileMap[p.user_id];
-    if (!name) return;
+    if (!name || !PLAYERS.includes(name)) return; // ignore unknown users
     submissionMap[name] = (submissionMap[name]||0) + 1;
   });
 
+  // Fixture count: for past GWs use max submitted, for current use API count
+  const maxSubmitted = Math.max(...Object.values(submissionMap).concat([0]));
+  const fixtureCount = gw === currentGW ? totalFixtures : (maxSubmitted || 8);
+
   const submittedCount = PLAYERS.filter(n => (submissionMap[n]||0) > 0).length;
   const pct = Math.round((submittedCount / PLAYERS.length) * 100);
-
-  // For current/future GW use API fixture count, for past use max submitted
-  const maxSubmitted = Math.max(...Object.values(submissionMap).concat([0]));
-  const fixtureCount = gw === parseInt(document.getElementById('gw-select').options[0]?.value) 
-    ? totalFixtures 
-    : (maxSubmitted || totalFixtures);
 
   document.getElementById('content').innerHTML = `
     <div class="panel">
       <div class="panel-header">
         <div class="panel-title">GW${gw} submissions</div>
-        <div class="panel-meta">${submittedCount} / ${PLAYERS.length} submitted</div>
+        <div class="panel-meta">${submittedCount} / ${PLAYERS.length} submitted · ${fixtureCount} fixtures</div>
       </div>
       <div class="progress-bar"><div class="progress-fill" style="width:${pct}%"></div></div>
       ${PLAYERS.map(name => {
-        const hasAccount = Object.values(profileMap).includes(name);
         const count = submissionMap[name] || 0;
         const complete = count >= fixtureCount && fixtureCount > 0;
         const partial = count > 0 && !complete;
+        const hasAccount = Object.values(profileMap).includes(name);
 
-        let statusBadge;
-        if (!hasAccount) {
-          statusBadge = '<span class="b b-red">✗ No account</span>';
-        } else if (complete) {
-          statusBadge = `<span class="b b-green">✓ All ${count} submitted</span>`;
-        } else if (partial) {
-          statusBadge = `<span class="b b-amber">⚠ Partial · ${count}/${fixtureCount}</span>`;
-        } else {
-          statusBadge = '<span class="b b-red">✗ Not submitted</span>';
-        }
+        let badge;
+        if (!hasAccount) badge = '<span class="b b-red">✗ No account</span>';
+        else if (complete) badge = `<span class="b b-green">✓ All ${count} submitted</span>`;
+        else if (partial) badge = `<span class="b b-amber">⚠ Partial · ${count}/${fixtureCount}</span>`;
+        else badge = '<span class="b b-red">✗ Not submitted</span>';
 
-        return `<div class="row">
-          <div class="player-name">${name}</div>
-          <div class="badges">${statusBadge}</div>
-        </div>`;
+        return `<div class="row"><div class="player-name">${name}</div><div class="badges">${badge}</div></div>`;
       }).join('')}
     </div>`;
 }
