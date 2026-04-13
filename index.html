@@ -1009,6 +1009,12 @@ async function fetchAndRenderFixtures(targetGW) {
   // Set currentGW first from Supabase
   if (!currentGW) currentGW = await estimateGWNumber([]);
 
+  // Clear stale cache entries older than the TTL to force fresh fixture data
+  const now_ts = Date.now();
+  Object.keys(plCache).forEach(k => {
+    if (now_ts - plCache[k].ts > CACHE_TTL) delete plCache[k];
+  });
+
   let weekend = [];
 
   // Calculate this weekend's Sat/Sun dates directly — no need to call fetchFixtures first
@@ -1044,7 +1050,15 @@ async function fetchAndRenderFixtures(targetGW) {
     });
   }
 
-  // Fallback: use Supabase predictions as fixture source if API unavailable
+  // Fallback 1: try fetchFixtures (SCHEDULED/TIMED)
+  if (!weekend.length) {
+    const allMatches = await fetchFixtures();
+    if (allMatches) {
+      weekend = filterWeekendMatches(allMatches);
+    }
+  }
+
+  // Fallback 2: use Supabase predictions as fixture source
   if (!weekend.length) {
     weekend = await fixturesFromPredictions(currentGW);
   }
@@ -1149,7 +1163,7 @@ function gwNavButtons(gw) {
 
   return `
     <button class="gw-nav-btn" ${prevGW < 27 ? 'disabled' : ''} onclick="navigateGW(${prevGW})">← GW${prevGW}</button>
-    <button class="gw-nav-btn" ${gw >= currentGW && !nextGWAvailable ? 'disabled' : gw >= currentGW + 1 ? 'disabled' : ''} onclick="navigateGW(${nextGW})">GW${nextGW} →</button>
+    <button class="gw-nav-btn" ${nextGW > currentGW && !nextGWAvailable ? 'disabled' : nextGW > currentGW + 1 ? 'disabled' : ''} onclick="navigateGW(${nextGW})">GW${nextGW} →</button>
   `;
 }
 
@@ -1725,13 +1739,34 @@ setTimeout(syncLiveResults, 5000); // 5s after load to let auth settle
 // Independent sync — runs every 60s regardless of deadline state
 // Fetches live matches and writes any FINISHED results to Supabase
 async function syncLiveResults() {
-  if (!currentUser || !currentGW || !currentMatches.length) return;
-  // Only sync results for the actual current weekend — use currentMatches dates
-  const live = await fetchLiveMatches();
-  if (live && live.length) {
-    buildLiveResults(live);
-    await syncResultsToSupabase(currentGW, live);
+  if (!currentUser) return;
+  // Fetch last 2 weekends to catch any unsynced results
+  const now = new Date();
+  const twoWeeksAgo = new Date(now);
+  twoWeeksAgo.setDate(now.getDate() - 14);
+  const dateFrom = ukDateStr(twoWeeksAgo.toISOString()).slice(0,10);
+  const dateTo = ukDateStr(now.toISOString()).slice(0,10);
+  const data = await plFetch(
+    `https://api.football-data.org/v4/competitions/PL/matches?dateFrom=${dateFrom}&dateTo=${dateTo}`
+  );
+  const matches = data?.matches?.filter(m => {
+    const day = ukWeekday(m.utcDate);
+    return day === 'Saturday' || day === 'Sunday';
+  }) || [];
+  if (!matches.length) return;
+
+  const finished = matches.filter(m => m.status === 'FINISHED');
+  if (finished.length) {
+    // Determine correct GW by looking up match keys in predictions table
+    const keys = finished.map(m => cleanTeamName(m.homeTeam?.name) + '_' + cleanTeamName(m.awayTeam?.name));
+    const { data: predRows } = await sb.from('predictions').select('gameweek,match_key').in('match_key', keys).limit(1);
+    const correctGW = predRows?.[0]?.gameweek;
+    if (correctGW) await syncResultsToSupabase(correctGW, finished);
   }
+
+  const live = matches.filter(m => ['IN_PLAY','PAUSED','FINISHED'].includes(m.status));
+  if (live.length) buildLiveResults(live);
+}
 }
 setInterval(syncLiveResults, 60000);
 </script>
