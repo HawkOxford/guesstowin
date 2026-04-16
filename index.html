@@ -71,7 +71,7 @@
 
   /* Leaderboard */
   .leaderboard-card { background: var(--card); border: 1px solid var(--border); border-radius: 10px; overflow: hidden; max-width: 600px; }
-  .lb-row { display: grid; grid-template-columns: 28px 1fr auto auto; align-items: center; gap: 0.75rem; padding: 0.85rem 1.1rem; border-bottom: 1px solid var(--border); transition: background 0.15s; }
+  .lb-row { display: grid; grid-template-columns: 36px 1fr auto auto; align-items: center; gap: 0.75rem; padding: 0.85rem 1.1rem; border-bottom: 1px solid var(--border); transition: background 0.15s; }
   .lb-row:last-child { border-bottom: none; }
   .lb-row:hover { background: rgba(0,230,118,0.03); }
   .lb-row.top-1 { background: rgba(255,213,79,0.05); }
@@ -710,23 +710,24 @@ async function renderLeaderboard() {
         const prevRank = prevRankMap[p.name] || p.rank;
         const rankDiff = prevRank - p.rank;
         const arrowStr = rankDiff > 0
-          ? `<span style="color:var(--green);font-size:0.62rem;font-weight:700">↑${rankDiff}</span>`
+          ? `<span style="color:var(--green);font-size:0.8rem;font-weight:700">↑${rankDiff}</span>`
           : rankDiff < 0
-          ? `<span style="color:var(--red);font-size:0.62rem;font-weight:700">↓${Math.abs(rankDiff)}</span>`
-          : `<span style="color:var(--muted);font-size:0.62rem">→</span>`;
+          ? `<span style="color:var(--red);font-size:0.8rem;font-weight:700">↓${Math.abs(rankDiff)}</span>`
+          : `<span style="color:var(--muted);font-size:0.8rem">→</span>`;
         const liveGWPts = p.liveGWPts || 0;
         const isLiveWeekend = deadlinePassed || isLiveWindow;
         const showLive = isLiveWeekend && liveGWPts > 0;
         return `<div class="lb-row ${rankClass(p.rank)}">
-          <div class="lb-rank">
+          <div class="lb-rank" style="display:flex;align-items:center;gap:2px">
             <span>${p.rank}</span>${arrowStr}
           </div>
           <div class="lb-name">${isGWLeader?'🏆 ':''}${p.name}
             ${tied?'<span class="tied-badge">TIE</span>':''}
             ${isMe?'<span class="you-badge">YOU</span>':''}
           </div>
+          ${showLive ? `<div style="text-align:center"><div style="font-family:'Bebas Neue',sans-serif;font-size:1.2rem;color:var(--green)">+${liveGWPts}</div><div style="font-size:0.6rem;color:var(--muted);letter-spacing:0.05em">THIS GW</div></div>` : '<div></div>'}
           <div class="lb-pts-col">
-            <div class="lb-points">${p.total}${showLive ? `<span style="font-size:0.75rem;color:var(--green);font-family:'DM Sans',sans-serif;font-weight:600;margin-left:0.4rem">+${liveGWPts}</span>` : ''}</div>
+            <div class="lb-points">${p.total}</div>
             <div class="lb-gw">£${p.weekly.toFixed(2)} won</div>
           </div>
         </div>`;
