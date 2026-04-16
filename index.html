@@ -1256,9 +1256,9 @@ async function renderGWView(gw) {
       const hCrest = m.homeTeam?.crest ? '<img class="team-crest" src="' + m.homeTeam.crest + '" alt="">' : '';
       const aCrest = m.awayTeam?.crest ? '<img class="team-crest" src="' + m.awayTeam.crest + '" alt="">' : '';
       const scoreRow = `<div class="score-inputs">
-        <input class="score-input" type="number" min="0" max="20" placeholder="–" data-key="${key}" data-side="home" value="${pred?.home!==undefined?pred.home:''}">
+        <input class="score-input" type="number" min="0" max="20" placeholder="–" data-key="${key}" data-side="home" value="${(pred?.home!==undefined&&pred?.home!==null)?pred.home:''}">
         <span class="score-sep">:</span>
-        <input class="score-input" type="number" min="0" max="20" placeholder="–" data-key="${key}" data-side="away" value="${pred?.away!==undefined?pred.away:''}">
+        <input class="score-input" type="number" min="0" max="20" placeholder="–" data-key="${key}" data-side="away" value="${(pred?.away!==undefined&&pred?.away!==null)?pred.away:''}">
       </div>`;
       const card = document.createElement('div');
       card.className = 'fixture-card';
@@ -1498,7 +1498,7 @@ function renderMatchesView(myPreds, deadline, liveMatches, weekend) {
   const hasLive=liveMatches.some(m=>m.status==='IN_PLAY'||m.status==='PAUSED');
 
   // Has this player submitted ANY predictions for this GW?
-  const hasAnyPreds=Object.values(myPreds).some(p=>p.home!==undefined||p.away!==undefined);
+  const hasAnyPreds=Object.values(myPreds).some(p=>p.home!==null&&p.home!==undefined&&p.away!==null&&p.away!==undefined);
 
   // Calculate running points for current player
   let totalPts=0, correctScores=0, correctResults=0;
@@ -1599,9 +1599,9 @@ function renderMatchesView(myPreds, deadline, liveMatches, weekend) {
           <span class="live-score-num">${res?.away??'–'}</span>
         </div>`
       : `<div class="score-inputs">
-          <input class="score-input" type="number" min="0" max="20" placeholder="–" data-key="${key}" data-side="home" value="${pred?.home!==undefined?pred.home:''}">
+          <input class="score-input" type="number" min="0" max="20" placeholder="–" data-key="${key}" data-side="home" value="${(pred?.home!==undefined&&pred?.home!==null)?pred.home:''}">
           <span class="score-sep">:</span>
-          <input class="score-input" type="number" min="0" max="20" placeholder="–" data-key="${key}" data-side="away" value="${pred?.away!==undefined?pred.away:''}">
+          <input class="score-input" type="number" min="0" max="20" placeholder="–" data-key="${key}" data-side="away" value="${(pred?.away!==undefined&&pred?.away!==null)?pred.away:''}">
         </div>`;
 
     // Sub row: time/status/pts/prediction below the main row
@@ -1618,7 +1618,7 @@ function renderMatchesView(myPreds, deadline, liveMatches, weekend) {
         if (pts!==null) subParts.push(`<span class="result-badge pts-${pts}">${pts===3?'✓ +3pts':pts===1?'~ +1pt':'✗ 0pts'}</span>`);
         else subParts.push(`<span>${formatMatchTime(m.utcDate)}</span>`);
       }
-      if (pred?.home!==undefined) subParts.push(`<span style="color:var(--muted)">You: ${pred.home}–${pred.away}</span>`);
+      if (pred?.home!==null&&pred?.home!==undefined&&pred?.away!==null&&pred?.away!==undefined) subParts.push(`<span style="color:var(--muted)">You: ${pred.home}–${pred.away}</span>`);
       else subParts.push('<span style="color:var(--red)">No prediction</span>');
     } else {
       subParts.push(`<span>${formatMatchTime(m.utcDate)}</span>`);
@@ -1643,11 +1643,16 @@ function renderMatchesView(myPreds, deadline, liveMatches, weekend) {
 }
 
 async function savePredictions() {
-  const preds={};
+  const raw={};
   document.querySelectorAll('.score-input').forEach(inp=>{
     const key=inp.dataset.key,side=inp.dataset.side;
-    if(!preds[key])preds[key]={};
-    if(inp.value!=='')preds[key][side]=parseInt(inp.value);
+    if(!raw[key])raw[key]={};
+    if(inp.value!=='')raw[key][side]=parseInt(inp.value);
+  });
+  // Only save fixtures where BOTH home and away are filled
+  const preds={};
+  Object.entries(raw).forEach(([key,scores])=>{
+    if(scores.home!==undefined&&scores.away!==undefined)preds[key]=scores;
   });
   const btn=document.getElementById('save-btn');
   btn.disabled=true;btn.textContent='Saving…';
