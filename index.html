@@ -1832,6 +1832,8 @@ async function renderAdmin() {
   (preds||[]).forEach(p => {
     const name = profileMap[p.user_id];
     if (!name || !PLAYERS.includes(name)) return;
+    // Only count genuinely submitted scores (non-null)
+    if (p.home_score === null || p.away_score === null) return;
     if (!subMap[p.gameweek]) subMap[p.gameweek] = {};
     subMap[p.gameweek][name] = (subMap[p.gameweek][name]||0) + 1;
   });
@@ -1902,14 +1904,23 @@ async function renderAdmin() {
     <div style="background:var(--card);border:1px solid var(--border);border-radius:8px;overflow:auto;margin-bottom:1.5rem">
       ${(() => {
         const gwPreds = (preds||[]).filter(p => p.gameweek === currentGW);
-        const matchKeys = [...new Set(gwPreds.map(p => p.match_key.replace(/^\d+_/, '')))].sort();
+        // Sort match keys by kickoff time using currentMatches, fall back to alpha
+        const keyTimeMap = {};
+        currentMatches.forEach(m => {
+          const key = (cleanTeamName(m.homeTeam?.name)||'') + '_' + (cleanTeamName(m.awayTeam?.name)||'');
+          keyTimeMap[key] = new Date(m.utcDate).getTime();
+        });
+        const rawKeys = [...new Set(gwPreds.map(p => p.match_key.replace(/^\d+_/, '')))];
+        const matchKeys = rawKeys.sort((a,b) => (keyTimeMap[a]||0) - (keyTimeMap[b]||0));
         if (!matchKeys.length) return '<div style="padding:1rem;color:var(--muted);font-size:0.78rem">No predictions submitted for GW' + currentGW + ' yet.</div>';
         return '<table style="width:100%;border-collapse:collapse;font-size:0.72rem;min-width:500px">' +
           '<thead><tr>' +
           '<th style="padding:0.5rem 1rem;text-align:left;color:var(--muted);font-size:0.65rem;letter-spacing:0.08em;text-transform:uppercase;border-bottom:1px solid var(--border)">Player</th>' +
           matchKeys.map(key => {
+            const m = currentMatches.find(m => (cleanTeamName(m.homeTeam?.name)||'')+'_'+(cleanTeamName(m.awayTeam?.name)||'') === key);
+            const time = m ? new Date(m.utcDate).toLocaleDateString('en-GB',{timeZone:'Europe/London',weekday:'short',day:'numeric',month:'short'}) + ' ' + formatMatchTime(m.utcDate) : key;
             const parts = key.split('_');
-            return '<th style="padding:0.5rem 0.5rem;text-align:center;color:var(--muted);font-size:0.6rem;letter-spacing:0.05em;text-transform:uppercase;border-bottom:1px solid var(--border)">' + parts[0] + ' v ' + parts.slice(1).join('_') + '</th>';
+            return '<th style="padding:0.5rem 0.5rem;text-align:center;color:var(--muted);font-size:0.6rem;letter-spacing:0.05em;text-transform:uppercase;border-bottom:1px solid var(--border)">' + parts[0] + ' v ' + parts.slice(1).join('_') + '<br><span style="font-weight:400;color:var(--muted);text-transform:none;letter-spacing:0">' + (m ? formatMatchTime(m.utcDate) : '') + '</span></th>';
           }).join('') +
           '</tr></thead><tbody>' +
           PLAYERS.map(name => {
@@ -1918,14 +1929,16 @@ async function renderAdmin() {
               const key = p.match_key.replace(/^\d+_/, '');
               playerPreds[key] = {home: p.home_score, away: p.away_score};
             });
+            // Count only genuinely submitted (non-null) scores
+            const submittedCount = Object.values(playerPreds).filter(p => p.home !== null && p.away !== null).length;
             const cells = matchKeys.map(key => {
               const pred = playerPreds[key];
               const has = pred && pred.home !== null && pred.away !== null;
               return '<td style="padding:0.45rem 0.5rem;text-align:center;border-bottom:1px solid rgba(31,46,31,0.3)">' +
-                (has ? '<span style="font-family:Bebas Neue,sans-serif;font-size:0.9rem">' + pred.home + '–' + pred.away + '</span>' : '<span style="color:var(--red);font-size:0.7rem">–</span>') +
+                (has ? '<span style="font-family:Bebas Neue,sans-serif;font-size:0.9rem">' + pred.home + '–' + pred.away + '</span>' : '<span style="color:rgba(106,125,106,0.4);font-size:0.7rem">–</span>') +
                 '</td>';
             }).join('');
-            return '<tr><td style="padding:0.45rem 1rem;font-weight:500;border-bottom:1px solid rgba(31,46,31,0.3);white-space:nowrap">' + name + '</td>' + cells + '</tr>';
+            return '<tr><td style="padding:0.45rem 1rem;font-weight:500;border-bottom:1px solid rgba(31,46,31,0.3);white-space:nowrap">' + name + ' <span style="font-size:0.65rem;color:var(--muted)">(' + submittedCount + '/' + matchKeys.length + ')</span></td>' + cells + '</tr>';
           }).join('') +
           '</tbody></table>';
       })()}
