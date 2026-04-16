@@ -650,15 +650,35 @@ async function renderLeaderboard() {
     if(liveMax>0) gwWinners[currentGW] = liveScores.filter(s=>s.pts===liveMax).map(s=>s.name);
   }
 
+  // Calculate base totals (without live GW) for previous standings comparison
+  const baseTotals = PLAYERS.map(name => {
+    const prevGWs = Object.entries(gwPoints[name]||{}).filter(([gw]) => parseInt(gw) < (currentGW||999));
+    const prevPts = prevGWs.reduce((a,[,b])=>a+b,0);
+    return { name, total: BASE_SCORES[name] + prevPts };
+  }).sort((a,b)=>b.total-a.total);
+  const prevRankMap = {};
+  let prevRank = 1;
+  for(let i=0;i<baseTotals.length;i++){
+    if(i>0 && baseTotals[i].total===baseTotals[i-1].total) prevRankMap[baseTotals[i].name]=prevRankMap[baseTotals[i-1].name];
+    else prevRankMap[baseTotals[i].name]=prevRank;
+    prevRank++;
+  }
+
   // Calculate totals AFTER live overlay is applied
   const totals = PLAYERS.map(name => {
     const supabasePts = Object.values(gwPoints[name]||{}).reduce((a,b)=>a+b,0);
     const total = BASE_SCORES[name] + supabasePts;
+    const liveGWPts = gwPoints[name]?.[currentGW] || 0;
+    // Base total without current GW live points (for +N display)
+    const prevGWPts = Object.entries(gwPoints[name]||{})
+      .filter(([gw]) => parseInt(gw) < (currentGW||999))
+      .reduce((a,[,b])=>a+b,0);
+    const baseTotal = BASE_SCORES[name] + prevGWPts;
     let extraPrize = 0;
     Object.entries(gwWinners).forEach(([gw,winners]) => {
       if(winners.includes(name)) extraPrize += 10/winners.length;
     });
-    return { name, total, weekly: BASE_WEEKLY_PRIZE[name] + extraPrize };
+    return { name, total, baseTotal, liveGWPts, weekly: BASE_WEEKLY_PRIZE[name] + extraPrize };
   }).sort((a,b)=>b.total-a.total);
 
   // Assign ranks
@@ -687,14 +707,32 @@ async function renderLeaderboard() {
         const tied = totals.filter(t=>t.total===p.total).length>1;
         const isMe = p.name===currentPlayerName;
         const isGWLeader = gwLeaders.includes(p.name);
+        const prevRank = prevRankMap[p.name] || p.rank;
+        const rankDiff = prevRank - p.rank; // positive = moved up
+        const arrow = rankDiff > 0
+          ? `<span style="color:var(--green);font-size:0.7rem;font-weight:700">↑${rankDiff}</span>`
+          : rankDiff < 0
+          ? `<span style="color:var(--red);font-size:0.7rem;font-weight:700">↓${Math.abs(rankDiff)}</span>`
+          : `<span style="color:var(--muted);font-size:0.7rem">→</span>`;
+        const liveGWPts = p.liveGWPts || 0;
+        const isLiveWeekend = deadlinePassed || isLiveWindow;
+        const liveLabel = isLiveWeekend && liveGWPts > 0
+          ? `<span style="color:var(--green);font-size:0.7rem;font-weight:600">+${liveGWPts} <span style="color:var(--muted);font-weight:400">= ${p.total}</span></span>`
+          : '';
         return `<div class="lb-row ${rankClass(p.rank)}">
-          <div class="lb-rank">${p.rank}</div>
+          <div class="lb-rank" style="display:flex;flex-direction:column;align-items:center;gap:1px">
+            <span>${p.rank}</span>
+            ${arrow}
+          </div>
           <div class="lb-name">${isGWLeader?'🏆 ':''}${p.name}
             ${tied?'<span class="tied-badge">TIE</span>':''}
             ${isMe?'<span class="you-badge">YOU</span>':''}
           </div>
           <div class="lb-pts-col">
-            <div class="lb-points">${p.total}</div>
+            <div class="lb-points" style="display:flex;align-items:baseline;gap:0.4rem;justify-content:flex-end">
+              ${isLiveWeekend && liveGWPts > 0 ? `<span style="font-size:0.9rem;color:var(--muted)">${p.baseTotal}</span>` : ''}
+              ${liveLabel || `<span>${p.total}</span>`}
+            </div>
             <div class="lb-gw">£${p.weekly.toFixed(2)} won</div>
           </div>
         </div>`;
