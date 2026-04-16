@@ -623,7 +623,7 @@ async function renderLeaderboard() {
       if (!name) return;
       if (!livePredMap[name]) livePredMap[name] = {};
       const key = p.match_key.replace(/^\d+_/, '');
-      livePredMap[name][key] = {home: p.home_score??0, away: p.away_score??0};
+      livePredMap[name][key] = {home: p.home_score, away: p.away_score};
     });
 
     PLAYERS.forEach(name => {
@@ -974,7 +974,7 @@ async function loadAllPredictions(gw) {
     if(!result[name])result[name]={};
     // Support both old key format (0_Home_Away) and new (Home_Away)
     const key=row.match_key.replace(/^\d+_/,'');
-    result[name][key]={home:row.home_score??0,away:row.away_score??0};
+    result[name][key]={home:row.home_score,away:row.away_score};
   });
   return result;
 }
@@ -1409,7 +1409,7 @@ async function renderGWView(gw) {
             const isMe = name === currentPlayerName;
             const cells = allKeys.map(key => {
               const h=p[key]?.home, a=p[key]?.away;
-              const has = h!==undefined && a!==undefined;
+              const has = h!==null && h!==undefined && a!==null && a!==undefined;
               const res = resultMap[key];
               const cp = res && has ? calcPoints(h,a,res.home,res.away) : null;
               const chipClass = cp===3?'pred-chip chip-correct-score':cp===1?'pred-chip chip-correct-result':cp===0?'pred-chip chip-wrong':'pred-chip';
@@ -1897,6 +1897,39 @@ async function renderAdmin() {
     <div style="background:var(--card);border:1px solid var(--border);border-radius:8px;padding:1rem;margin-bottom:1.5rem;font-size:0.78rem;color:var(--muted)">
       No live data cached yet — available during the weekend when matches are in progress.
     </div>`}
+
+    <div class="section-label">GW${currentGW} Submitted Scores</div>
+    <div style="background:var(--card);border:1px solid var(--border);border-radius:8px;overflow:auto;margin-bottom:1.5rem">
+      ${(() => {
+        const gwPreds = (preds||[]).filter(p => p.gameweek === currentGW);
+        const matchKeys = [...new Set(gwPreds.map(p => p.match_key.replace(/^\d+_/, '')))].sort();
+        if (!matchKeys.length) return '<div style="padding:1rem;color:var(--muted);font-size:0.78rem">No predictions submitted for GW' + currentGW + ' yet.</div>';
+        return '<table style="width:100%;border-collapse:collapse;font-size:0.72rem;min-width:500px">' +
+          '<thead><tr>' +
+          '<th style="padding:0.5rem 1rem;text-align:left;color:var(--muted);font-size:0.65rem;letter-spacing:0.08em;text-transform:uppercase;border-bottom:1px solid var(--border)">Player</th>' +
+          matchKeys.map(key => {
+            const parts = key.split('_');
+            return '<th style="padding:0.5rem 0.5rem;text-align:center;color:var(--muted);font-size:0.6rem;letter-spacing:0.05em;text-transform:uppercase;border-bottom:1px solid var(--border)">' + parts[0] + ' v ' + parts.slice(1).join('_') + '</th>';
+          }).join('') +
+          '</tr></thead><tbody>' +
+          PLAYERS.map(name => {
+            const playerPreds = {};
+            gwPreds.filter(p => profileMap[p.user_id] === name).forEach(p => {
+              const key = p.match_key.replace(/^\d+_/, '');
+              playerPreds[key] = {home: p.home_score, away: p.away_score};
+            });
+            const cells = matchKeys.map(key => {
+              const pred = playerPreds[key];
+              const has = pred && pred.home !== null && pred.away !== null;
+              return '<td style="padding:0.45rem 0.5rem;text-align:center;border-bottom:1px solid rgba(31,46,31,0.3)">' +
+                (has ? '<span style="font-family:Bebas Neue,sans-serif;font-size:0.9rem">' + pred.home + '–' + pred.away + '</span>' : '<span style="color:var(--red);font-size:0.7rem">–</span>') +
+                '</td>';
+            }).join('');
+            return '<tr><td style="padding:0.45rem 1rem;font-weight:500;border-bottom:1px solid rgba(31,46,31,0.3);white-space:nowrap">' + name + '</td>' + cells + '</tr>';
+          }).join('') +
+          '</tbody></table>';
+      })()}
+    </div>
 
     <div class="section-label">Points by Gameweek</div>
     <div style="background:var(--card);border:1px solid var(--border);border-radius:8px;overflow:auto;margin-bottom:1.5rem">
