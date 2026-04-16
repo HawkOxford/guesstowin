@@ -708,31 +708,26 @@ async function renderLeaderboard() {
         const isMe = p.name===currentPlayerName;
         const isGWLeader = gwLeaders.includes(p.name);
         const prevRank = prevRankMap[p.name] || p.rank;
-        const rankDiff = prevRank - p.rank; // positive = moved up
-        const arrow = rankDiff > 0
-          ? `<span style="color:var(--green);font-size:0.7rem;font-weight:700">↑${rankDiff}</span>`
+        const rankDiff = prevRank - p.rank;
+        const arrowStr = rankDiff > 0
+          ? `<span style="color:var(--green);font-size:0.62rem;font-weight:700">↑${rankDiff}</span>`
           : rankDiff < 0
-          ? `<span style="color:var(--red);font-size:0.7rem;font-weight:700">↓${Math.abs(rankDiff)}</span>`
-          : `<span style="color:var(--muted);font-size:0.7rem">→</span>`;
+          ? `<span style="color:var(--red);font-size:0.62rem;font-weight:700">↓${Math.abs(rankDiff)}</span>`
+          : `<span style="color:var(--muted);font-size:0.62rem">→</span>`;
         const liveGWPts = p.liveGWPts || 0;
         const isLiveWeekend = deadlinePassed || isLiveWindow;
-        const liveLabel = isLiveWeekend && liveGWPts > 0
-          ? `<span style="color:var(--green);font-size:0.7rem;font-weight:600">+${liveGWPts} <span style="color:var(--muted);font-weight:400">= ${p.total}</span></span>`
-          : '';
+        const showLive = isLiveWeekend && liveGWPts > 0;
         return `<div class="lb-row ${rankClass(p.rank)}">
-          <div class="lb-rank" style="display:flex;flex-direction:column;align-items:center;gap:1px">
-            <span>${p.rank}</span>
-            ${arrow}
+          <div class="lb-rank">
+            <span>${p.rank}</span>${arrowStr}
           </div>
           <div class="lb-name">${isGWLeader?'🏆 ':''}${p.name}
             ${tied?'<span class="tied-badge">TIE</span>':''}
             ${isMe?'<span class="you-badge">YOU</span>':''}
           </div>
           <div class="lb-pts-col">
-            <div class="lb-points" style="display:flex;align-items:baseline;gap:0.4rem;justify-content:flex-end">
-              ${isLiveWeekend && liveGWPts > 0 ? `<span style="font-size:0.9rem;color:var(--muted)">${p.baseTotal}</span>` : ''}
-              ${liveLabel || `<span>${p.total}</span>`}
-            </div>
+            ${showLive ? `<div style="font-size:0.65rem;color:var(--muted);text-align:right;margin-bottom:1px">${p.baseTotal} <span style="color:var(--green)">+${liveGWPts}</span></div>` : ''}
+            <div class="lb-points">${p.total}</div>
             <div class="lb-gw">£${p.weekly.toFixed(2)} won</div>
           </div>
         </div>`;
