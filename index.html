@@ -180,7 +180,7 @@
   @keyframes fadeIn { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: translateY(0); } }
 
   .gw-nav { display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem; }
-  .gw-nav-btn { background: var(--bg3); border: 1px solid var(--border); border-radius: 6px; padding: 0.3rem 0.9rem; font-family: 'DM Sans', sans-serif; font-size: 0.75rem; color: var(--muted); cursor: pointer; transition: all 0.15s; }
+  .gw-nav-btn { background: var(--bg3); border: 1px solid var(--border); border-radius: 6px; padding: 0.3rem 0.9rem; font-family: 'DM Sans', sans-serif; font-size: 0.75rem; color: var(--text); cursor: pointer; transition: all 0.15s; }
   .gw-nav-btn:hover { border-color: var(--green); color: var(--green); }
   .gw-nav-btn:disabled { opacity: 0.25; cursor: not-allowed; pointer-events: none; }
   .winner-banner { display: flex; align-items: center; gap: 0.8rem; background: rgba(255,213,79,0.06); border: 1px solid rgba(255,213,79,0.2); border-radius: 8px; padding: 0.75rem 1rem; margin-bottom: 1rem; }
@@ -195,7 +195,7 @@
     .fixture-main { grid-template-columns: minmax(0,1fr) 20px auto 20px minmax(0,1fr); gap: 0.35rem; }
     .fixture-team { font-size: 0.88rem; }
     .team-crest { width: 18px; height: 18px; }
-    .score-input { width: 34px; height: 36px; font-size: 1.15rem; }
+    .score-input { width: 34px; height: 44px; font-size: 1.15rem; }
     .score-sep { font-size: 1.15rem; }
     .live-score-num { font-size: 1.2rem; min-width: 20px; }
   }
@@ -1400,7 +1400,7 @@ async function renderGWView(gw) {
       <table class="pred-table">
         <thead><tr>
           <th>Player</th>
-          ${allKeys.map(key => { const p=key.split('_'); return `<th>${p[0]} v ${p.slice(1).join('_')}</th>`; }).join('')}
+          ${allKeys.map(key => { const p=key.split('_'); const h=p[0]; const a=p.slice(1).join('_'); const abbrevMap={'Arsenal':'ARS','Bournemouth':'BOU','Brentford':'BRE','Brighton':'BHA','Burnley':'BUR','Chelsea':'CHE','Crystal Palace':'CRY','Everton':'EVE','Fulham':'FUL','Leeds':'LEE','Liverpool':'LIV','Man City':'MCI','Man Utd':'MNU','Newcastle':'NEW',"Nott'm Forest":'NFO','Spurs':'TOT','Sunderland':'SUN','Aston Villa':'AVL','West Ham':'WHU','Wolves':'WOL','Ipswich':'IPS','Leicester':'LEI','Southampton':'SOU'}; const ab=n=>abbrevMap[n]||n.slice(0,3).toUpperCase(); return `<th>${ab(h)} v ${ab(a)}</th>`; }).join('')}
           <th>GW pts</th>
         </tr></thead>
         <tbody>
@@ -1678,10 +1678,21 @@ function renderSummary(myPreds) {
   const section = document.getElementById('summary-section');
   if (!currentMatches.length) { section.style.display = 'none'; return; }
 
+  const abbrev = name => {
+    const map = {
+      'Arsenal':'ARS','Bournemouth':'BOU','Brentford':'BRE','Brighton':'BHA',
+      'Burnley':'BUR','Chelsea':'CHE','Crystal Palace':'CRY','Everton':'EVE',
+      'Fulham':'FUL','Leeds':'LEE','Liverpool':'LIV','Man City':'MCI',
+      'Man Utd':'MNU','Newcastle':'NEW',"Nott'm Forest":'NFO','Spurs':'TOT',
+      'Sunderland':'SUN','Aston Villa':'AVL','West Ham':'WHU','Wolves':'WOL',
+      'Ipswich':'IPS','Leicester':'LEI','Southampton':'SOU'
+    };
+    return map[name] || name.slice(0,3).toUpperCase();
+  };
   const allKeys = currentMatches.map((m, i) => {
     const home = cleanTeamName(m.homeTeam?.name) || 'Home';
     const away = cleanTeamName(m.awayTeam?.name) || 'Away';
-    return { key: `${home}_${away}`, label: `${home} v ${away}` };
+    return { key: `${home}_${away}`, label: `${abbrev(home)} v ${abbrev(away)}` };
   });
 
   // Before deadline: show hidden notice (always rebuild innerHTML cleanly)
