@@ -726,8 +726,7 @@ async function renderLeaderboard() {
             ${isMe?'<span class="you-badge">YOU</span>':''}
           </div>
           <div class="lb-pts-col">
-            ${showLive ? `<div style="font-size:0.65rem;color:var(--muted);text-align:right;margin-bottom:1px">${p.baseTotal} <span style="color:var(--green)">+${liveGWPts}</span></div>` : ''}
-            <div class="lb-points">${p.total}</div>
+            <div class="lb-points">${p.total}${showLive ? `<span style="font-size:0.75rem;color:var(--green);font-family:'DM Sans',sans-serif;font-weight:600;margin-left:0.4rem">+${liveGWPts}</span>` : ''}</div>
             <div class="lb-gw">£${p.weekly.toFixed(2)} won</div>
           </div>
         </div>`;
