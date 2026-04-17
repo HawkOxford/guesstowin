@@ -1432,31 +1432,8 @@ async function renderGWView(gw) {
     <div class="predictions-summary">
       <table class="pred-table">
         <thead><tr>
-          <th style="position:sticky;left:0;z-index:2;background:#0a0f0a;min-width:90px;text-align:left">Player</th>
-          <th style="position:sticky;left:90px;z-index:2;background:#0a0f0a;min-width:48px;text-align:center;border-right:1px solid var(--border)">GW</th>
-          \${allKeys.map(key => { const p=key.split('_'); const h=p[0]; const a=p.slice(1).join('_'); return `<th style="min-width:68px;text-align:center">\${ab(h)} v \${ab(a)}</th>`; }).join('')}
-        </tr></thead>
-        <tbody>
-          \${gwScores.map(({name, pts}) => {
-            const p = predMap[name] || {};
-            const isMe = name === currentPlayerName;
-            const cells = allKeys.map(key => {
-              const h=p[key]?.home, a=p[key]?.away;
-              const has = h!==null && h!==undefined && a!==null && a!==undefined;
-              const res = resultMap[key];
-              const cp = res && has ? calcPoints(h,a,res.home,res.away) : null;
-              const chipClass = cp===3?'pred-chip chip-correct-score':cp===1?'pred-chip chip-correct-result':cp===0?'pred-chip chip-wrong':'pred-chip';
-              return `<td style="text-align:center"><span class="\${has?chipClass:'pred-chip empty'}">\${has?h+'–'+a:'–'}</span></td>`;
-            }).join('');
-            return `<tr \${isMe?'class="my-row"':''}>
-              <td style="\${isMe?'position:sticky;left:0;z-index:1;background:#141c14;font-weight:600;white-space:nowrap;text-align:left':'position:sticky;left:0;z-index:1;background:#0a0f0a;font-weight:500;white-space:nowrap;text-align:left'}">\${name}\${isMe?' <span class="you-badge">YOU</span>':''}</td>
-              <td style="\${isMe?'position:sticky;left:90px;z-index:1;background:#141c14;font-family:'Bebas Neue',sans-serif;font-size:1.1rem;color:var(--green);text-align:center;border-right:1px solid var(--border)':'position:sticky;left:90px;z-index:1;background:#0a0f0a;font-family:'Bebas Neue',sans-serif;font-size:1.1rem;color:var(--green);text-align:center;border-right:1px solid var(--border)'}">\${pts}</td>
-              \${cells}
-            </tr>`;
-          }).join('')}
-        </tbody>
-      </table>
-    </div>` }).join('')}
+          <th>Player</th>
+          ${allKeys.map(key => { const p=key.split('_'); const h=p[0]; const a=p.slice(1).join('_'); const abbrevMap={'Arsenal':'ARS','Bournemouth':'BOU','Brentford':'BRE','Brighton':'BHA','Burnley':'BUR','Chelsea':'CHE','Crystal Palace':'CRY','Everton':'EVE','Fulham':'FUL','Leeds':'LEE','Liverpool':'LIV','Man City':'MCI','Man Utd':'MNU','Newcastle':'NEW',"Nott'm Forest":'NFO','Spurs':'TOT','Sunderland':'SUN','Aston Villa':'AVL','West Ham':'WHU','Wolves':'WOL','Ipswich':'IPS','Leicester':'LEI','Southampton':'SOU'}; const ab=n=>abbrevMap[n]||n.slice(0,3).toUpperCase(); return `<th>${ab(h)} v ${ab(a)}</th>`; }).join('')}
           <th>GW pts</th>
         </tr></thead>
         <tbody>
@@ -1765,41 +1742,28 @@ function renderSummary(myPreds) {
   section.innerHTML = `
     <div class="section-label" style="margin-top:2rem">All predictions this gameweek</div>
     <div class="predictions-summary">
-      <table class="pred-table">
-        <thead><tr>
-          <th style="position:sticky;left:0;z-index:2;background:#0a0f0a;min-width:90px;text-align:left">Player</th>
-          <th style="position:sticky;left:90px;z-index:2;background:#0a0f0a;min-width:48px;text-align:center;border-right:1px solid var(--border)">GW</th>
-          \${allKeys.map(({label}) => `<th style="min-width:68px;text-align:center">\${label}</th>`).join('')}
-        </tr></thead>
-        <tbody>
-          \${[...PLAYERS].map(name => {
-            const preds = allPredictions[name] || {};
-            let gwTotal = 0;
-            const cells = allKeys.map(({key}) => {
-              const h = preds[key]?.home ?? null;
-              const a = preds[key]?.away ?? null;
-              const has = h !== null && a !== null;
-              const res = liveResults[key];
-              const pts = res && has ? calcPoints(h, a, res.home, res.away) : null;
-              if (pts === 3) gwTotal += 3;
-              else if (pts === 1) gwTotal += 1;
-              const chipClass = pts === 3 ? 'pred-chip chip-correct-score'
-                : pts === 1 ? 'pred-chip chip-correct-result'
-                : pts === 0 ? 'pred-chip chip-wrong' : 'pred-chip';
-              return `<td style="text-align:center"><span class="\${has ? chipClass : 'pred-chip empty'}">\${has ? h+'–'+a : '–'}</span></td>`;
-            }).join('');
-            return { name, gwTotal, cells };
-          }).sort((a,b) => b.gwTotal - a.gwTotal).map(({name, gwTotal, cells}) => {
-            const isMe = name === currentPlayerName;
-            return `<tr \${isMe ? 'class="my-row"' : ''}>
-              <td style="\${isMe ? 'position:sticky;left:0;z-index:1;background:#141c14;font-weight:600;white-space:nowrap;text-align:left' : 'position:sticky;left:0;z-index:1;background:#0a0f0a;font-weight:500;white-space:nowrap;text-align:left'}">\${name}\${isMe ? ' <span class="you-badge">YOU</span>' : ''}</td>
-              <td style="\${isMe ? 'position:sticky;left:90px;z-index:1;background:#141c14;font-family:'Bebas Neue',sans-serif;font-size:1.1rem;color:var(--green);text-align:center;border-right:1px solid var(--border)' : 'position:sticky;left:90px;z-index:1;background:#0a0f0a;font-family:'Bebas Neue',sans-serif;font-size:1.1rem;color:var(--green);text-align:center;border-right:1px solid var(--border)'}">\${gwTotal}</td>
-              \${cells}
-            </tr>`;
-          }).join('')}
-        </tbody>
-      </table>
-    </div>`
+        <table class="pred-table">
+          <thead><tr>
+            <th style="position:sticky;left:0;z-index:2;background:#0a0f0a;min-width:80px">Player</th>
+            <th style="position:sticky;left:80px;z-index:2;background:#0a0f0a;min-width:44px;text-align:center">GW</th>
+            ${allKeys.map(({label}) => `<th style="min-width:62px;text-align:center">${label}</th>`).join('')}
+          </tr></thead>
+          <tbody>
+            ${[...PLAYERS].map(name => {
+              const preds = allPredictions[name] || {};
+              let gwTotal = 0;
+              const cells = allKeys.map(({key}) => {
+                const h = preds[key]?.home ?? null;
+                const a = preds[key]?.away ?? null;
+                const has = h !== null && a !== null;
+                const res = liveResults[key];
+                const pts = res && has ? calcPoints(h, a, res.home, res.away) : null;
+                if (pts === 3) gwTotal += 3;
+                else if (pts === 1) gwTotal += 1;
+                const chipClass = pts === 3 ? 'pred-chip chip-correct-score'
+                  : pts === 1 ? 'pred-chip chip-correct-result'
+                  : pts === 0 ? 'pred-chip chip-wrong' : 'pred-chip';
+                return `<td style="text-align:center"><span class="${has ? chipClass : 'pred-chip empty'}">${has ? h+'–'+a : '–'}</span></td>`;
               }).join('');
               return { name, gwTotal, cells };
             }).sort((a,b) => b.gwTotal - a.gwTotal).map(({name, gwTotal, cells}) => {
