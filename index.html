@@ -149,10 +149,10 @@
   .save-msg.show { opacity: 1; }
 
   /* Predictions table */
-  .predictions-summary { margin-top: 2rem; overflow-x: auto; }
-  .pred-table { width: 100%; border-collapse: collapse; font-size: 0.78rem; min-width: 600px; }
-  .pred-table th { padding: 0.5rem 0.75rem; text-align: left; color: var(--muted); font-weight: 500; font-size: 0.65rem; letter-spacing: 0.08em; text-transform: uppercase; border-bottom: 1px solid var(--border); }
-  .pred-table td { padding: 0.55rem 0.75rem; border-bottom: 1px solid rgba(31,46,31,0.5); vertical-align: middle; }
+  .predictions-summary { margin-top: 2rem; overflow-x: auto; -webkit-overflow-scrolling: touch; }
+  .pred-table { width: max-content; min-width: 100%; border-collapse: collapse; font-size: 0.78rem; }
+  .pred-table th { padding: 0.5rem 0.6rem; text-align: center; color: var(--muted); font-weight: 500; font-size: 0.65rem; letter-spacing: 0.06em; text-transform: uppercase; border-bottom: 1px solid var(--border); white-space: nowrap; }
+  .pred-table td { padding: 0.55rem 0.6rem; border-bottom: 1px solid rgba(31,46,31,0.5); vertical-align: middle; white-space: nowrap; }
   .pred-table tr:last-child td { border-bottom: none; }
   .pred-table tr:hover td { background: rgba(0,230,118,0.02); }
   .pred-table tr.my-row td { background: rgba(255,213,79,0.03); }
@@ -1741,12 +1741,11 @@ function renderSummary(myPreds) {
   section.style.display = '';
   section.innerHTML = `
     <div class="section-label" style="margin-top:2rem">All predictions this gameweek</div>
-    <div class="predictions-summary" style="position:relative">
-      <div style="overflow-x:auto;-webkit-overflow-scrolling:touch">
-        <table class="pred-table" style="min-width:max-content">
+    <div class="predictions-summary">
+        <table class="pred-table">
           <thead><tr>
-            <th style="position:sticky;left:0;z-index:2;background:var(--bg);min-width:80px">Player</th>
-            <th style="position:sticky;left:80px;z-index:2;background:var(--bg);min-width:44px;text-align:center">GW</th>
+            <th style="position:sticky;left:0;z-index:2;background:#0a0f0a;min-width:80px">Player</th>
+            <th style="position:sticky;left:80px;z-index:2;background:#0a0f0a;min-width:44px;text-align:center">GW</th>
             ${allKeys.map(({label}) => `<th style="min-width:62px;text-align:center">${label}</th>`).join('')}
           </tr></thead>
           <tbody>
@@ -1770,14 +1769,13 @@ function renderSummary(myPreds) {
             }).sort((a,b) => b.gwTotal - a.gwTotal).map(({name, gwTotal, cells}) => {
               const isMe = name === currentPlayerName;
               return `<tr ${isMe ? 'class="my-row"' : ''}>
-                <td style="position:sticky;left:0;z-index:1;background:${isMe?'rgba(255,213,79,0.03)':'var(--bg)'};font-weight:${isMe?'600':'500'};white-space:nowrap">${name}${isMe?' <span class="you-badge">YOU</span>':''}</td>
-                <td style="position:sticky;left:80px;z-index:1;background:${isMe?'rgba(255,213,79,0.03)':'var(--bg)'};font-family:'Bebas Neue',sans-serif;font-size:1.1rem;color:var(--green);text-align:center">${gwTotal}</td>
+                <td style="position:sticky;left:0;z-index:1;background:${isMe?'rgba(20,28,20,1)':'#0a0f0a'};font-weight:${isMe?'600':'500'};white-space:nowrap">${name}${isMe?' <span class="you-badge">YOU</span>':''}</td>
+                <td style="position:sticky;left:80px;z-index:1;background:${isMe?'rgba(20,28,20,1)':'#0a0f0a'};font-family:'Bebas Neue',sans-serif;font-size:1.1rem;color:var(--green);text-align:center">${gwTotal}</td>
                 ${cells}
               </tr>`;
             }).join('')}
           </tbody>
         </table>
-      </div>
     </div>`;
 }
 
