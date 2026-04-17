@@ -1741,41 +1741,43 @@ function renderSummary(myPreds) {
   section.style.display = '';
   section.innerHTML = `
     <div class="section-label" style="margin-top:2rem">All predictions this gameweek</div>
-    <div class="predictions-summary">
-      <table class="pred-table">
-        <thead><tr>
-          <th>Player</th>
-          ${allKeys.map(({label}) => `<th>${label}</th>`).join('')}
-          <th>GW pts</th>
-        </tr></thead>
-        <tbody>
-          ${[...PLAYERS].map(name => {
-            const preds = allPredictions[name] || {};
-            let gwTotal = 0;
-            const cells = allKeys.map(({key}) => {
-              const h = preds[key]?.home ?? null;
-              const a = preds[key]?.away ?? null;
-              const has = h !== null && a !== null;
-              const res = liveResults[key];
-              const pts = res && has ? calcPoints(h, a, res.home, res.away) : null;
-              if (pts === 3) gwTotal += 3;
-              else if (pts === 1) gwTotal += 1;
-              const chipClass = pts === 3 ? 'pred-chip chip-correct-score'
-                : pts === 1 ? 'pred-chip chip-correct-result'
-                : pts === 0 ? 'pred-chip chip-wrong' : 'pred-chip';
-              return `<td><span class="${has ? chipClass : 'pred-chip empty'}">${has ? h+'–'+a : '–'}</span></td>`;
-            }).join('');
-            return { name, gwTotal, cells };
-          }).sort((a,b) => b.gwTotal - a.gwTotal).map(({name, gwTotal, cells}) => {
-            const isMe = name === currentPlayerName;
-            return `<tr ${isMe ? 'class="my-row"' : ''}>
-              <td style="font-weight:${isMe ? '600' : '500'}">${name}${isMe ? ' <span class="you-badge">YOU</span>' : ''}</td>
-              ${cells}
-              <td style="font-family:'Bebas Neue',sans-serif;font-size:1.2rem;color:var(--green)">${gwTotal}</td>
-            </tr>`;
-          }).join('')}
-        </tbody>
-      </table>
+    <div class="predictions-summary" style="position:relative">
+      <div style="overflow-x:auto;-webkit-overflow-scrolling:touch">
+        <table class="pred-table" style="min-width:max-content">
+          <thead><tr>
+            <th style="position:sticky;left:0;z-index:2;background:var(--bg);min-width:80px">Player</th>
+            <th style="position:sticky;left:80px;z-index:2;background:var(--bg);min-width:44px;text-align:center">GW</th>
+            ${allKeys.map(({label}) => `<th style="min-width:62px;text-align:center">${label}</th>`).join('')}
+          </tr></thead>
+          <tbody>
+            ${[...PLAYERS].map(name => {
+              const preds = allPredictions[name] || {};
+              let gwTotal = 0;
+              const cells = allKeys.map(({key}) => {
+                const h = preds[key]?.home ?? null;
+                const a = preds[key]?.away ?? null;
+                const has = h !== null && a !== null;
+                const res = liveResults[key];
+                const pts = res && has ? calcPoints(h, a, res.home, res.away) : null;
+                if (pts === 3) gwTotal += 3;
+                else if (pts === 1) gwTotal += 1;
+                const chipClass = pts === 3 ? 'pred-chip chip-correct-score'
+                  : pts === 1 ? 'pred-chip chip-correct-result'
+                  : pts === 0 ? 'pred-chip chip-wrong' : 'pred-chip';
+                return `<td style="text-align:center"><span class="${has ? chipClass : 'pred-chip empty'}">${has ? h+'–'+a : '–'}</span></td>`;
+              }).join('');
+              return { name, gwTotal, cells };
+            }).sort((a,b) => b.gwTotal - a.gwTotal).map(({name, gwTotal, cells}) => {
+              const isMe = name === currentPlayerName;
+              return `<tr ${isMe ? 'class="my-row"' : ''}>
+                <td style="position:sticky;left:0;z-index:1;background:${isMe?'rgba(255,213,79,0.03)':'var(--bg)'};font-weight:${isMe?'600':'500'};white-space:nowrap">${name}${isMe?' <span class="you-badge">YOU</span>':''}</td>
+                <td style="position:sticky;left:80px;z-index:1;background:${isMe?'rgba(255,213,79,0.03)':'var(--bg)'};font-family:'Bebas Neue',sans-serif;font-size:1.1rem;color:var(--green);text-align:center">${gwTotal}</td>
+                ${cells}
+              </tr>`;
+            }).join('')}
+          </tbody>
+        </table>
+      </div>
     </div>`;
 }
 
