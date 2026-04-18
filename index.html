@@ -147,14 +147,25 @@
   .btn-save:disabled { opacity: 0.5; cursor: not-allowed; transform: none; }
   .save-msg { font-size: 0.8rem; color: var(--green); opacity: 0; transition: opacity 0.3s; }
   .save-msg.show { opacity: 1; }
-  .save-confirm-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.7); z-index: 1000; display: flex; align-items: center; justify-content: center; padding: 1.5rem; }
-  .save-confirm-card { background: var(--card); border: 1px solid var(--green); border-radius: 12px; padding: 1.5rem; width: 100%; max-width: 420px; max-height: 85vh; overflow-y: auto; }
-  .save-confirm-title { font-family: 'Bebas Neue', sans-serif; font-size: 1.6rem; color: var(--green); margin-bottom: 0.25rem; }
-  .save-confirm-sub { font-size: 0.72rem; color: var(--muted); margin-bottom: 1.2rem; }
-  .save-confirm-row { display: flex; justify-content: space-between; align-items: center; padding: 0.45rem 0; border-bottom: 1px solid var(--border); font-size: 0.82rem; }
-  .save-confirm-row:last-of-type { border-bottom: none; }
-  .save-confirm-score { font-family: 'Bebas Neue', sans-serif; font-size: 1rem; color: var(--green); }
-  .save-confirm-btn { width: 100%; background: var(--green); color: #031a03; border: none; border-radius: 7px; padding: 0.75rem; font-family: 'DM Sans', sans-serif; font-weight: 700; font-size: 0.9rem; cursor: pointer; margin-top: 1.2rem; }
+  .save-confirm-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.75); z-index: 1000; display: flex; align-items: center; justify-content: center; padding: 1.5rem; }
+  .save-confirm-card { background: #141c14; border: 1px solid #2a3d2a; border-radius: 14px; width: 100%; max-width: 400px; max-height: 85vh; overflow-y: auto; overflow-x: hidden; }
+  .save-confirm-header { padding: 1.25rem 1.4rem 1rem; border-bottom: 1px solid var(--border); }
+  .save-confirm-title { display: flex; align-items: center; gap: 8px; margin-bottom: 4px; }
+  .save-confirm-title-text { font-family: 'Bebas Neue', sans-serif; font-size: 1.3rem; color: var(--green); letter-spacing: 0.04em; }
+  .save-confirm-sub { display: flex; align-items: baseline; gap: 6px; font-size: 0.7rem; color: var(--muted); }
+  .save-confirm-sub-name { font-size: 0.82rem; color: var(--text); font-weight: 500; }
+  .save-confirm-sub-count { color: var(--green); }
+  .save-confirm-body { padding: 0.5rem 1.4rem 0.25rem; }
+  .save-confirm-day { font-size: 0.6rem; font-weight: 500; letter-spacing: 0.15em; text-transform: uppercase; color: var(--muted); padding: 0.6rem 0 0.3rem; }
+  .save-confirm-day.has-border { border-top: 1px solid rgba(31,46,31,0.5); margin-top: 0.25rem; }
+  .save-confirm-row { display: flex; justify-content: space-between; align-items: center; padding: 0.45rem 0; border-bottom: 1px solid rgba(31,46,31,0.5); }
+  .save-confirm-row:last-child { border-bottom: none; }
+  .save-confirm-fixture { font-size: 0.82rem; color: var(--text); font-weight: 500; }
+  .save-confirm-time { font-size: 0.68rem; color: var(--muted); }
+  .save-confirm-score { font-family: 'Bebas Neue', sans-serif; font-size: 1.15rem; color: var(--text); letter-spacing: 0.05em; }
+  .save-confirm-footer { padding: 1rem 1.4rem 1.25rem; border-top: 1px solid var(--border); margin-top: 0.5rem; display: flex; align-items: center; justify-content: space-between; }
+  .save-confirm-deadline { font-size: 0.7rem; color: var(--muted); }
+  .save-confirm-btn { background: var(--green); color: #031a03; border: none; border-radius: 6px; padding: 0.5rem 1.4rem; font-family: 'DM Sans', sans-serif; font-weight: 700; font-size: 0.82rem; cursor: pointer; }
 
   /* Predictions table */
   .predictions-summary { margin-top: 2rem; overflow-x: auto; -webkit-overflow-scrolling: touch; }
@@ -1789,45 +1800,72 @@ async function savePredictions() {
 }
 
 function showSaveConfirmation(preds) {
-  // Build rows for each saved prediction sorted by kickoff time
   const savedKeys = Object.keys(preds);
-  const rows = currentMatches
+
+  // Group matches by day
+  const sorted = currentMatches
     .filter(m => {
       const home = cleanTeamName(m.homeTeam?.name) || 'Home';
       const away = cleanTeamName(m.awayTeam?.name) || 'Away';
       return savedKeys.includes(home + '_' + away);
     })
-    .map(m => {
-      const home = cleanTeamName(m.homeTeam?.name) || 'Home';
-      const away = cleanTeamName(m.awayTeam?.name) || 'Away';
-      const key = home + '_' + away;
-      const pred = preds[key];
-      const time = formatMatchTime(m.utcDate);
-      const day = new Date(m.utcDate).toLocaleDateString('en-GB', {timeZone:'Europe/London', weekday:'short'});
-      return '<div class="save-confirm-row">' +
-        '<span>' + home + ' v ' + away + ' <span style="color:var(--muted);font-size:0.7rem">' + day + ' ' + time + '</span></span>' +
-        '<span class="save-confirm-score">' + pred.home + ' – ' + pred.away + '</span>' +
-        '</div>';
-    }).join('');
+    .sort((a,b) => new Date(a.utcDate) - new Date(b.utcDate));
 
-  const unsaved = savedKeys.filter(k => !currentMatches.some(m => {
+  // Build rows grouped by day
+  let rowsHTML = '';
+  let lastDay = null;
+  let firstDay = true;
+  sorted.forEach(m => {
     const home = cleanTeamName(m.homeTeam?.name) || 'Home';
     const away = cleanTeamName(m.awayTeam?.name) || 'Away';
-    return home + '_' + away === k;
-  }));
+    const key = home + '_' + away;
+    const pred = preds[key];
+    const time = formatMatchTime(m.utcDate);
+    const dayLabel = new Date(m.utcDate).toLocaleDateString('en-GB', {timeZone:'Europe/London', weekday:'long', day:'numeric', month:'long'});
+    if (dayLabel !== lastDay) {
+      lastDay = dayLabel;
+      rowsHTML += '<div class="save-confirm-day' + (firstDay ? '' : ' has-border') + '">' + dayLabel + '</div>';
+      firstDay = false;
+    }
+    rowsHTML += '<div class="save-confirm-row">' +
+      '<div><div class="save-confirm-fixture">' + home + ' v ' + away + '</div><div class="save-confirm-time">' + time + '</div></div>' +
+      '<span class="save-confirm-score">' + pred.home + ':' + pred.away + '</span>' +
+      '</div>';
+  });
+
+  const unsaved = currentMatches.length - savedKeys.length;
+  const deadline = currentMatches.map(m => new Date(m.utcDate)).sort((a,b) => a-b)[0];
+  const deadlineStr = deadline ? deadline.toLocaleDateString('en-GB',{timeZone:'Europe/London',weekday:'short',day:'numeric',month:'short'}) + ' · ' + deadline.toLocaleTimeString('en-GB',{timeZone:'Europe/London',hour:'2-digit',minute:'2-digit'}) : '';
 
   const overlay = document.createElement('div');
   overlay.className = 'save-confirm-overlay';
-  overlay.innerHTML = '<div class="save-confirm-card">' +
-    '<div class="save-confirm-title">✓ Predictions saved</div>' +
-    '<div class="save-confirm-sub">GW' + currentGW + ' · ' + savedKeys.length + ' of ' + currentMatches.length + ' fixtures · ' + currentPlayerName + '</div>' +
-    rows +
-    (unsaved.length ? '<div style="font-size:0.72rem;color:var(--amber);margin-top:0.75rem">⚠ ' + unsaved.length + ' fixture(s) not filled in</div>' : '') +
-    '<button class="save-confirm-btn" onclick="this.closest(&quot;.save-confirm-overlay&quot;).remove()">Got it</button>' +
+  overlay.innerHTML =
+    '<div class="save-confirm-card">' +
+      '<div class="save-confirm-header">' +
+        '<div class="save-confirm-title">' +
+          '<svg width="16" height="16" viewBox="0 0 16 16" fill="none"><circle cx="8" cy="8" r="7.5" stroke="#00e676" stroke-width="1"/><polyline points="4.5,8.5 7,11 11.5,5.5" stroke="#00e676" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>' +
+          '<span class="save-confirm-title-text">Predictions saved</span>' +
+        '</div>' +
+        '<div class="save-confirm-sub">' +
+          '<span class="save-confirm-sub-name">' + currentPlayerName + '</span>' +
+          '<span>·</span>' +
+          '<span>Gameweek ' + currentGW + '</span>' +
+          '<span>·</span>' +
+          '<span class="save-confirm-sub-count">' + savedKeys.length + ' / ' + currentMatches.length + ' submitted</span>' +
+        '</div>' +
+      '</div>' +
+      '<div class="save-confirm-body">' +
+        rowsHTML +
+        (unsaved > 0 ? '<div style="font-size:0.72rem;color:var(--amber);padding:0.75rem 0">⚠ ' + unsaved + ' fixture(s) not filled in</div>' : '') +
+      '</div>' +
+      '<div class="save-confirm-footer">' +
+        '<span class="save-confirm-deadline">Deadline: ' + deadlineStr + '</span>' +
+        '<button class="save-confirm-btn" onclick="this.closest('.save-confirm-overlay').remove()">Done</button>' +
+      '</div>' +
     '</div>';
+
   document.body.appendChild(overlay);
-  // Also tap outside to dismiss
-  overlay.onclick = function(e) { if (e.target === overlay) overlay.remove(); };
+  overlay.addEventListener('click', function(e) { if (e.target === overlay) overlay.remove(); });
 }
 
 function renderSummary(myPreds) {
