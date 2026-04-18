@@ -822,7 +822,7 @@ function cleanTeamName(name) {
 
 const SUPABASE_PROXY = 'https://iufbdwsmbwrtcqzkvyey.supabase.co/functions/v1/football-proxy';
 const plCache = {}; // simple in-memory cache
-const CACHE_TTL = 45000; // 45 seconds
+const CACHE_TTL = 25000; // 25 seconds — ensures fresh data within one 30s refresh cycle
 
 async function plFetch(url) {
   if (simulationActive) return null;
@@ -1227,20 +1227,24 @@ async function fetchAndRenderFixtures(targetGW) {
 
     if (refreshTimer) clearInterval(refreshTimer);
     if (deadlinePassed) {
-      refreshTimer = setInterval(async () => {
-        const typed = {};
-        document.querySelectorAll('.score-input').forEach(inp => {
-          if (inp.value !== '') typed[inp.dataset.key + '|' + inp.dataset.side] = inp.value;
-        });
+      const doLiveRefresh = async () => {
         const live = await fetchLiveMatches();
         await syncResultsToSupabase(currentGW, live);
         buildLiveResults(live);
-        renderMatchesView(allPredictions[currentPlayerName]||{}, deadline, live, currentMatches);
-        document.querySelectorAll('.score-input').forEach(inp => {
-          const v = typed[inp.dataset.key + '|' + inp.dataset.side];
-          if (v !== undefined && inp.value === '') inp.value = v;
-        });
-      }, 60000);
+        // Only re-render fixture cards if user is viewing the current GW
+        if (viewingGW === currentGW) {
+          const typed = {};
+          document.querySelectorAll('.score-input').forEach(inp => {
+            if (inp.value !== '') typed[inp.dataset.key + '|' + inp.dataset.side] = inp.value;
+          });
+          renderMatchesView(allPredictions[currentPlayerName]||{}, deadline, live, currentMatches);
+          document.querySelectorAll('.score-input').forEach(inp => {
+            const v = typed[inp.dataset.key + '|' + inp.dataset.side];
+            if (v !== undefined && inp.value === '') inp.value = v;
+          });
+        }
+      };
+      refreshTimer = setInterval(doLiveRefresh, 30000); // 30s — max 55s to screen with 25s cache
     }
   } else {
     if (refreshTimer) clearInterval(refreshTimer);
@@ -2242,16 +2246,7 @@ async function syncLiveResults() {
   if (thisWeekendFinished.length) {
     await syncResultsToSupabase(currentGW, thisWeekendFinished);
   }
-
-  const live = matches.filter(m => ['IN_PLAY','PAUSED','FINISHED'].includes(m.status));
-  if (live.length) {
-    buildLiveResults(live);
-    // Re-render fixture cards so scores update on screen immediately
-    if (deadlinePassed && currentMatches.length) {
-      const deadline = currentMatches.map(m => new Date(m.utcDate)).sort((a,b) => a-b)[0];
-      renderMatchesView(allPredictions[currentPlayerName]||{}, deadline, live, currentMatches);
-    }
-  }
+  // Note: screen rendering is handled by refreshTimer (every 30s) — no render here to avoid duplication
 }
 setInterval(syncLiveResults, 60000);
 
