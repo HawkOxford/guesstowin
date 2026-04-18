@@ -71,7 +71,7 @@
 
   /* Leaderboard */
   .leaderboard-card { background: var(--card); border: 1px solid var(--border); border-radius: 10px; overflow: hidden; max-width: 600px; }
-  .lb-row { display: grid; grid-template-columns: 36px 1fr auto auto; align-items: center; gap: 0.75rem; padding: 0.85rem 1.1rem; border-bottom: 1px solid var(--border); transition: background 0.15s; }
+  .lb-row { display: grid; grid-template-columns: 36px 1fr 52px 72px; align-items: center; gap: 0.75rem; padding: 0.85rem 1.1rem; border-bottom: 1px solid var(--border); transition: background 0.15s; }
   .lb-row:last-child { border-bottom: none; }
   .lb-row:hover { background: rgba(0,230,118,0.03); }
   .lb-row.top-1 { background: rgba(255,213,79,0.05); }
@@ -733,7 +733,7 @@ async function renderLeaderboard() {
             ${tied?'<span class="tied-badge">TIE</span>':''}
             ${isMe?'<span class="you-badge">YOU</span>':''}
           </div>
-          ${showLive ? `<div style="text-align:center"><div style="font-family:'Bebas Neue',sans-serif;font-size:1.2rem;color:var(--green)">+${liveGWPts}</div><div style="font-size:0.6rem;color:var(--muted);letter-spacing:0.05em">THIS GW</div></div>` : '<div></div>'}
+          <div style="text-align:center">${showLive ? `<div style="font-family:'Bebas Neue',sans-serif;font-size:1.2rem;color:var(--green)">+${liveGWPts}</div><div style="font-size:0.6rem;color:var(--muted);letter-spacing:0.05em">THIS GW</div>` : ''}</div>
           <div class="lb-pts-col">
             <div class="lb-points">${p.total}</div>
             <div class="lb-gw">£${p.weekly.toFixed(2)} won</div>
@@ -988,17 +988,18 @@ function formatMatchTime(utcDate) {
 async function estimateGWNumber(matches) {
   const BASE_GW = 26;
   try {
-    // Get all finished results grouped by GW
-    const { data: resultRows } = await sb.from('results').select('gameweek').eq('status', 'finished');
-    const validGWs = (resultRows || []).map(r => r.gameweek).filter(gw => gw >= 27 && gw <= 38);
-    if (!validGWs.length) return BASE_GW + 1;
+    const { data: resultRows } = await sb.from('results').select('gameweek,match_key').eq('status', 'finished');
+    const validRows = (resultRows || []).filter(r => r.gameweek >= 27 && r.gameweek <= 38);
+    if (!validRows.length) return BASE_GW + 1;
 
-    // Count results per GW
+    // Count unique finished results per GW
     const resultCounts = {};
-    validGWs.forEach(gw => { resultCounts[gw] = (resultCounts[gw] || 0) + 1; });
+    validRows.forEach(r => {
+      if (!resultCounts[r.gameweek]) resultCounts[r.gameweek] = new Set();
+      resultCounts[r.gameweek].add(r.match_key);
+    });
 
-    // For each GW, count how many unique fixtures existed (from predictions table)
-    // A GW is only complete when results count matches fixture count for that GW
+    // Determine expected fixture count per GW from predictions table
     const { data: predRows } = await sb.from('predictions').select('gameweek,match_key');
     const fixtureCounts = {};
     (predRows || []).forEach(p => {
@@ -1007,14 +1008,18 @@ async function estimateGWNumber(matches) {
       fixtureCounts[p.gameweek].add(key);
     });
 
-    // A GW is complete when all its fixtures have a finished result
-    const completedGWs = Object.keys(resultCounts)
-      .map(gw => parseInt(gw))
-      .filter(gw => {
-        const fixtureCount = fixtureCounts[gw] ? fixtureCounts[gw].size : 0;
-        const resultCount = resultCounts[gw] || 0;
-        return fixtureCount > 0 && resultCount >= fixtureCount;
-      });
+    // For the highest GW we have results for, also factor in currentMatches
+    // so we never declare the current GW complete if not all fixtures have finished
+    const gwsWithResults = Object.keys(resultCounts).map(Number).sort((a,b) => a-b);
+    const highestGW = Math.max(...gwsWithResults);
+    const currentFixtureCount = currentMatches.length > 0 ? currentMatches.length : (fixtureCounts[highestGW] ? fixtureCounts[highestGW].size : 9);
+
+    const completedGWs = gwsWithResults.filter(gw => {
+      const resultCount = resultCounts[gw].size;
+      // For the highest GW, use currentMatches count as authoritative fixture count
+      const expectedCount = gw === highestGW ? currentFixtureCount : (fixtureCounts[gw] ? fixtureCounts[gw].size : 9);
+      return resultCount >= expectedCount;
+    });
 
     if (!completedGWs.length) return BASE_GW + 1;
     const maxCompleted = Math.max(...completedGWs);
