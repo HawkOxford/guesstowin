@@ -2231,13 +2231,16 @@ async function syncLiveResults() {
   }) || [];
   if (!matches.length) return;
 
-  const finished = matches.filter(m => m.status === 'FINISHED');
-  if (finished.length) {
-    // Determine correct GW by looking up match keys in predictions table
-    const keys = finished.map(m => cleanTeamName(m.homeTeam?.name) + '_' + cleanTeamName(m.awayTeam?.name));
-    const { data: predRows } = await sb.from('predictions').select('gameweek,match_key').in('match_key', keys).limit(1);
-    const correctGW = predRows?.[0]?.gameweek;
-    if (correctGW) await syncResultsToSupabase(correctGW, finished);
+  // Only write results for THIS WEEKEND's matches — filter to currentMatches dates only
+  const currentMatchKeys = new Set(currentMatches.map(m =>
+    cleanTeamName(m.homeTeam?.name) + '_' + cleanTeamName(m.awayTeam?.name)
+  ));
+  const thisWeekendFinished = matches.filter(m => {
+    const key = cleanTeamName(m.homeTeam?.name) + '_' + cleanTeamName(m.awayTeam?.name);
+    return m.status === 'FINISHED' && currentMatchKeys.has(key);
+  });
+  if (thisWeekendFinished.length) {
+    await syncResultsToSupabase(currentGW, thisWeekendFinished);
   }
 
   const live = matches.filter(m => ['IN_PLAY','PAUSED','FINISHED'].includes(m.status));
