@@ -1077,6 +1077,7 @@ async function syncResultsToSupabase(gw, liveMatches) {
 
   // Look up the correct gameweek for each match from the predictions table
   // Predictions table is the source of truth for which GW a fixture belongs to
+  // Only look at the most recent GW for each match_key to avoid pulling stale GW27 entries
   const keys = matchData.map(m => m.key);
   const { data: predRows } = await sb.from('predictions').select('gameweek,match_key').in('match_key', keys);
 
@@ -1085,11 +1086,14 @@ async function syncResultsToSupabase(gw, liveMatches) {
     return;
   }
 
-  // Build map: match_key -> gameweek (from predictions)
+  // Build map: match_key -> highest gameweek found (most recent = correct current GW)
   const keyToGW = {};
   predRows.forEach(p => {
     const cleanKey = p.match_key.replace(/^\d+_/, '');
-    if (!keyToGW[cleanKey]) keyToGW[cleanKey] = p.gameweek;
+    // Take the highest GW number — this is the current GW, not a historical one
+    if (!keyToGW[cleanKey] || p.gameweek > keyToGW[cleanKey]) {
+      keyToGW[cleanKey] = p.gameweek;
+    }
   });
 
   // Only write rows where we found a matching gameweek in predictions, and GW is valid (27-38)
