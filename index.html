@@ -1811,13 +1811,11 @@ function showSaveConfirmation(preds) {
     '<div class="save-confirm-sub">GW' + currentGW + ' · ' + savedKeys.length + ' of ' + currentMatches.length + ' fixtures · ' + currentPlayerName + '</div>' +
     rows +
     (unsaved.length ? '<div style="font-size:0.72rem;color:var(--amber);margin-top:0.75rem">⚠ ' + unsaved.length + ' fixture(s) not filled in</div>' : '') +
-    '<button class="save-confirm-btn" onclick="this.closest('.save-confirm-overlay').remove()">Got it</button>' +
+    '<button class="save-confirm-btn" onclick="this.closest(&quot;.save-confirm-overlay&quot;).remove()">Got it</button>' +
     '</div>';
   document.body.appendChild(overlay);
   // Also tap outside to dismiss
-  overlay.addEventListener('click', function(e) {
-    if (e.target === overlay) overlay.remove();
-  });
+  overlay.onclick = function(e) { if (e.target === overlay) overlay.remove(); };
 }
 
 function renderSummary(myPreds) {
