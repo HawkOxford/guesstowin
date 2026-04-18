@@ -981,7 +981,8 @@ async function estimateGWNumber(matches) {
   const BASE_GW = 26;
   try {
     const { data } = await sb.from('results').select('gameweek');
-    const completedGWs = new Set((data || []).map(r => r.gameweek)).size;
+    // Only count GWs >= 27 (this season) to avoid phantom rows
+    const completedGWs = new Set((data || []).map(r => r.gameweek).filter(gw => gw >= 27)).size;
     return BASE_GW + completedGWs + 1;
   } catch(e) {
     return BASE_GW + 1;
