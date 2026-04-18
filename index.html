@@ -980,11 +980,36 @@ function formatMatchTime(utcDate) {
 async function estimateGWNumber(matches) {
   const BASE_GW = 26;
   try {
-    const { data } = await sb.from('results').select('gameweek').eq('status', 'finished');
-    const validGWs = (data || []).map(r => r.gameweek).filter(gw => gw >= 27 && gw <= 38);
+    // Get all finished results grouped by GW
+    const { data: resultRows } = await sb.from('results').select('gameweek').eq('status', 'finished');
+    const validGWs = (resultRows || []).map(r => r.gameweek).filter(gw => gw >= 27 && gw <= 38);
     if (!validGWs.length) return BASE_GW + 1;
-    const maxCompleted = Math.max(...validGWs);
-    // Current GW = highest completed GW + 1, capped at 38
+
+    // Count results per GW
+    const resultCounts = {};
+    validGWs.forEach(gw => { resultCounts[gw] = (resultCounts[gw] || 0) + 1; });
+
+    // For each GW, count how many unique fixtures existed (from predictions table)
+    // A GW is only complete when results count matches fixture count for that GW
+    const { data: predRows } = await sb.from('predictions').select('gameweek,match_key');
+    const fixtureCounts = {};
+    (predRows || []).forEach(p => {
+      const key = p.match_key.replace(/^\d+_/, '');
+      if (!fixtureCounts[p.gameweek]) fixtureCounts[p.gameweek] = new Set();
+      fixtureCounts[p.gameweek].add(key);
+    });
+
+    // A GW is complete when all its fixtures have a finished result
+    const completedGWs = Object.keys(resultCounts)
+      .map(gw => parseInt(gw))
+      .filter(gw => {
+        const fixtureCount = fixtureCounts[gw] ? fixtureCounts[gw].size : 0;
+        const resultCount = resultCounts[gw] || 0;
+        return fixtureCount > 0 && resultCount >= fixtureCount;
+      });
+
+    if (!completedGWs.length) return BASE_GW + 1;
+    const maxCompleted = Math.max(...completedGWs);
     return Math.min(maxCompleted + 1, 38);
   } catch(e) {
     return BASE_GW + 1;
