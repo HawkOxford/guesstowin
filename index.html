@@ -1130,10 +1130,12 @@ async function fetchAndRenderFixtures(targetGW) {
   // Calculate this weekend's Sat/Sun dates directly — no need to call fetchFixtures first
   const now = new Date();
   const todayDay = now.toLocaleDateString('en-GB', {timeZone:'Europe/London', weekday:'long'});
+  // Use UK day number to avoid UTC/local timezone mismatch
+  const ukDayNum = ['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'].indexOf(todayDay);
   let satDate = new Date(now);
   if (todayDay === 'Sunday') satDate.setDate(satDate.getDate() - 1);
   else if (todayDay !== 'Saturday') {
-    const daysUntilSat = (6 - now.getDay() + 7) % 7 || 7;
+    const daysUntilSat = (6 - ukDayNum + 7) % 7 || 7;
     satDate.setDate(satDate.getDate() + daysUntilSat);
   }
   const satStr = ukDateStr(satDate.toISOString()).slice(0,10);
@@ -2192,6 +2194,22 @@ async function syncLiveResults() {
   if (live.length) buildLiveResults(live);
 }
 setInterval(syncLiveResults, 60000);
+
+// ── Auto-advance score inputs ─────────────────────────────────────────────────
+// When a single digit is entered, move focus to the next score input
+document.addEventListener('input', function(e) {
+  if (!e.target.classList.contains('score-input')) return;
+  const val = e.target.value;
+  // Only auto-advance if a single digit was entered (0-9)
+  if (val.length !== 1) return;
+  // Get all visible, non-disabled score inputs in DOM order
+  const inputs = Array.from(document.querySelectorAll('.score-input:not(:disabled)'));
+  const idx = inputs.indexOf(e.target);
+  if (idx !== -1 && idx < inputs.length - 1) {
+    inputs[idx + 1].focus();
+    inputs[idx + 1].select();
+  }
+});
 </script>
 </body>
 </html>
