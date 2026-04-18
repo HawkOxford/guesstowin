@@ -1701,8 +1701,8 @@ function renderMatchesView(myPreds, deadline, liveMatches, weekend) {
     const aCrest = m.awayTeam?.crest ? '<img class="team-crest" src="' + m.awayTeam.crest + '" alt="">' : '';
 
     // Score row only - time and prediction go in subRow below
-    // Time shown above fixture only when match hasn't started
-    const timeAbove = !matchLocked ? `<div class="fixture-sub" style="margin-bottom:0.2rem">${formatMatchTime(m.utcDate)}</div>` : '';
+    // Time shown above fixture only until THAT specific match kicks off
+    const timeAbove = !matchStarted ? `<div class="fixture-sub" style="margin-bottom:0.2rem">${formatMatchTime(m.utcDate)}</div>` : '';
 
     const scoreRow = matchLocked
       ? `<div class="live-score">
