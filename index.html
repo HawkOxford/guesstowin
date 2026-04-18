@@ -1728,7 +1728,7 @@ function renderMatchesView(myPreds, deadline, liveMatches, weekend) {
         if (pts!==null) subParts.push(`<span class="result-badge pts-${pts}">${pts===3?'✓ +3pts':pts===1?'~ +1pt':'✗ 0pts'}</span>`);
         else subParts.push(`<span>${formatMatchTime(m.utcDate)}</span>`);
       }
-      if (pred?.home!==null&&pred?.home!==undefined&&pred?.away!==null&&pred?.away!==undefined) subParts.push(`<span style="color:var(--muted)">You: ${pred.home}–${pred.away}</span>`);
+      if (pred?.home!==null&&pred?.home!==undefined&&pred?.away!==null&&pred?.away!==undefined) subParts.push(`<span style="background:rgba(255,255,255,0.07);color:var(--text);border-radius:4px;padding:1px 6px;font-weight:500">You: ${pred.home}–${pred.away}</span>`);
       else subParts.push('<span style="color:var(--red)">No prediction</span>');
     } else {
       subParts.push(`<span>${formatMatchTime(m.utcDate)}</span>`);
