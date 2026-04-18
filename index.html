@@ -147,6 +147,14 @@
   .btn-save:disabled { opacity: 0.5; cursor: not-allowed; transform: none; }
   .save-msg { font-size: 0.8rem; color: var(--green); opacity: 0; transition: opacity 0.3s; }
   .save-msg.show { opacity: 1; }
+  .save-confirm-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.7); z-index: 1000; display: flex; align-items: center; justify-content: center; padding: 1.5rem; }
+  .save-confirm-card { background: var(--card); border: 1px solid var(--green); border-radius: 12px; padding: 1.5rem; width: 100%; max-width: 420px; max-height: 85vh; overflow-y: auto; }
+  .save-confirm-title { font-family: 'Bebas Neue', sans-serif; font-size: 1.6rem; color: var(--green); margin-bottom: 0.25rem; }
+  .save-confirm-sub { font-size: 0.72rem; color: var(--muted); margin-bottom: 1.2rem; }
+  .save-confirm-row { display: flex; justify-content: space-between; align-items: center; padding: 0.45rem 0; border-bottom: 1px solid var(--border); font-size: 0.82rem; }
+  .save-confirm-row:last-of-type { border-bottom: none; }
+  .save-confirm-score { font-family: 'Bebas Neue', sans-serif; font-size: 1rem; color: var(--green); }
+  .save-confirm-btn { width: 100%; background: var(--green); color: #031a03; border: none; border-radius: 7px; padding: 0.75rem; font-family: 'DM Sans', sans-serif; font-weight: 700; font-size: 0.9rem; cursor: pointer; margin-top: 1.2rem; }
 
   /* Predictions table */
   .predictions-summary { margin-top: 2rem; overflow-x: auto; -webkit-overflow-scrolling: touch; }
@@ -1755,9 +1763,6 @@ async function savePredictions() {
   const ok=await saveMyPredictions(currentGW,preds);
   btn.disabled=false;btn.textContent='Save my predictions';
   if(ok){
-    const msg=document.getElementById('save-msg');
-    msg.classList.add('show');
-    setTimeout(()=>msg.classList.remove('show'),2500);
     allPredictions[currentPlayerName]=preds;
     // Update input values to show saved predictions
     document.querySelectorAll('.score-input').forEach(inp=>{
@@ -1767,7 +1772,52 @@ async function savePredictions() {
       }
     });
     renderSummary(preds);
+    showSaveConfirmation(preds);
   }
+}
+
+function showSaveConfirmation(preds) {
+  // Build rows for each saved prediction sorted by kickoff time
+  const savedKeys = Object.keys(preds);
+  const rows = currentMatches
+    .filter(m => {
+      const home = cleanTeamName(m.homeTeam?.name) || 'Home';
+      const away = cleanTeamName(m.awayTeam?.name) || 'Away';
+      return savedKeys.includes(home + '_' + away);
+    })
+    .map(m => {
+      const home = cleanTeamName(m.homeTeam?.name) || 'Home';
+      const away = cleanTeamName(m.awayTeam?.name) || 'Away';
+      const key = home + '_' + away;
+      const pred = preds[key];
+      const time = formatMatchTime(m.utcDate);
+      const day = new Date(m.utcDate).toLocaleDateString('en-GB', {timeZone:'Europe/London', weekday:'short'});
+      return '<div class="save-confirm-row">' +
+        '<span>' + home + ' v ' + away + ' <span style="color:var(--muted);font-size:0.7rem">' + day + ' ' + time + '</span></span>' +
+        '<span class="save-confirm-score">' + pred.home + ' – ' + pred.away + '</span>' +
+        '</div>';
+    }).join('');
+
+  const unsaved = savedKeys.filter(k => !currentMatches.some(m => {
+    const home = cleanTeamName(m.homeTeam?.name) || 'Home';
+    const away = cleanTeamName(m.awayTeam?.name) || 'Away';
+    return home + '_' + away === k;
+  }));
+
+  const overlay = document.createElement('div');
+  overlay.className = 'save-confirm-overlay';
+  overlay.innerHTML = '<div class="save-confirm-card">' +
+    '<div class="save-confirm-title">✓ Predictions saved</div>' +
+    '<div class="save-confirm-sub">GW' + currentGW + ' · ' + savedKeys.length + ' of ' + currentMatches.length + ' fixtures · ' + currentPlayerName + '</div>' +
+    rows +
+    (unsaved.length ? '<div style="font-size:0.72rem;color:var(--amber);margin-top:0.75rem">⚠ ' + unsaved.length + ' fixture(s) not filled in</div>' : '') +
+    '<button class="save-confirm-btn" onclick="this.closest('.save-confirm-overlay').remove()">Got it</button>' +
+    '</div>';
+  document.body.appendChild(overlay);
+  // Also tap outside to dismiss
+  overlay.addEventListener('click', function(e) {
+    if (e.target === overlay) overlay.remove();
+  });
 }
 
 function renderSummary(myPreds) {
