@@ -2241,7 +2241,14 @@ async function syncLiveResults() {
   }
 
   const live = matches.filter(m => ['IN_PLAY','PAUSED','FINISHED'].includes(m.status));
-  if (live.length) buildLiveResults(live);
+  if (live.length) {
+    buildLiveResults(live);
+    // Re-render fixture cards so scores update on screen immediately
+    if (deadlinePassed && currentMatches.length) {
+      const deadline = currentMatches.map(m => new Date(m.utcDate)).sort((a,b) => a-b)[0];
+      renderMatchesView(allPredictions[currentPlayerName]||{}, deadline, live, currentMatches);
+    }
+  }
 }
 setInterval(syncLiveResults, 60000);
 
