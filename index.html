@@ -1372,8 +1372,7 @@ async function renderGWView(gw) {
       </div>`;
       const card = document.createElement('div');
       card.className = 'fixture-card';
-      const subRowNext = `<div class="fixture-sub">${formatMatchTime(m.utcDate)}</div>`;
-      card.innerHTML = `<div class="fixture-main"><div class="fixture-team home">${home}</div><div class="fixture-crest">${hCrest}</div>${scoreRow}<div class="fixture-crest">${aCrest}</div><div class="fixture-team away">${away}</div></div>${subRowNext}`;
+      card.innerHTML = `<div class="fixture-sub" style="margin-bottom:0.2rem">${formatMatchTime(m.utcDate)}</div><div class="fixture-main"><div class="fixture-team home">${home}</div><div class="fixture-crest">${hCrest}</div>${scoreRow}<div class="fixture-crest">${aCrest}</div><div class="fixture-team away">${away}</div></div>`;
       list.appendChild(card);
     });
     return;
@@ -1491,7 +1490,7 @@ async function renderGWView(gw) {
     </div>`;
     const subRow = `<div class="fixture-sub">
       ${pts!==null?`<span class="result-badge pts-${pts}">${pts===3?'✓ +3pts':pts===1?'~ +1pt':'✗ 0pts'}</span>`:''}
-      ${pred!==undefined?`<span style="color:var(--muted)">You: ${pred.home}–${pred.away}</span>`:'<span style="color:var(--red)">No prediction</span>'}
+      ${pred!==undefined&&pred.home!==null&&pred.away!==null?`<span style="background:rgba(255,255,255,0.07);color:var(--text);border-radius:4px;padding:1px 6px;font-weight:500">You: ${pred.home}–${pred.away}</span>`:'<span style="color:var(--red)">No prediction</span>'}
     </div>`;
     const card = document.createElement('div');
     card.className = cardClass;
@@ -1702,6 +1701,9 @@ function renderMatchesView(myPreds, deadline, liveMatches, weekend) {
     const aCrest = m.awayTeam?.crest ? '<img class="team-crest" src="' + m.awayTeam.crest + '" alt="">' : '';
 
     // Score row only - time and prediction go in subRow below
+    // Time shown above fixture only when match hasn't started
+    const timeAbove = !matchLocked ? `<div class="fixture-sub" style="margin-bottom:0.2rem">${formatMatchTime(m.utcDate)}</div>` : '';
+
     const scoreRow = matchLocked
       ? `<div class="live-score">
           <span class="live-score-num">${res?.home??'–'}</span>
@@ -1726,18 +1728,17 @@ function renderMatchesView(myPreds, deadline, liveMatches, weekend) {
       } else {
         // Finished
         if (pts!==null) subParts.push(`<span class="result-badge pts-${pts}">${pts===3?'✓ +3pts':pts===1?'~ +1pt':'✗ 0pts'}</span>`);
-        else subParts.push(`<span>${formatMatchTime(m.utcDate)}</span>`);
+
       }
       if (pred?.home!==null&&pred?.home!==undefined&&pred?.away!==null&&pred?.away!==undefined) subParts.push(`<span style="background:rgba(255,255,255,0.07);color:var(--text);border-radius:4px;padding:1px 6px;font-weight:500">You: ${pred.home}–${pred.away}</span>`);
       else subParts.push('<span style="color:var(--red)">No prediction</span>');
-    } else {
-      subParts.push(`<span>${formatMatchTime(m.utcDate)}</span>`);
     }
     const subRow = `<div class="fixture-sub">${subParts.join(' · ')}</div>`;
 
     const card=document.createElement('div');
     card.className=cardClass;
     card.innerHTML=`
+      ${timeAbove}
       <div class="fixture-main">
         <div class="fixture-team home">${home}</div>
         <div class="fixture-crest">${hCrest}</div>
