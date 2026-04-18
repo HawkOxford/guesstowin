@@ -735,7 +735,7 @@ async function renderLeaderboard() {
           : `<span style="color:var(--muted);font-size:0.8rem">→</span>`;
         const liveGWPts = p.liveGWPts || 0;
         const isLiveWeekend = deadlinePassed || isLiveWindow;
-        const showLive = isLiveWeekend && liveGWPts > 0;
+        const showLive = isLiveWeekend;
         return `<div class="lb-row ${rankClass(p.rank)}">
           <div class="lb-rank" style="display:flex;align-items:center;gap:2px">
             <span>${p.rank}</span>${arrowStr}
@@ -744,7 +744,7 @@ async function renderLeaderboard() {
             ${tied?'<span class="tied-badge">TIE</span>':''}
             ${isMe?'<span class="you-badge">YOU</span>':''}
           </div>
-          <div style="text-align:center">${showLive ? `<div style="font-family:'Bebas Neue',sans-serif;font-size:1.2rem;color:var(--green)">+${liveGWPts}</div><div style="font-size:0.6rem;color:var(--muted);letter-spacing:0.05em">THIS GW</div>` : ''}</div>
+          <div style="text-align:center">${showLive ? '<div style="font-family:Bebas Neue,sans-serif;font-size:1.2rem;color:var(--green)">+' + liveGWPts + '</div><div style="font-size:0.6rem;color:var(--muted);letter-spacing:0.05em">THIS GW</div>' : ''}</div>
           <div class="lb-pts-col">
             <div class="lb-points">${p.total}</div>
             <div class="lb-gw">£${p.weekly.toFixed(2)} won</div>
