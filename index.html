@@ -771,12 +771,14 @@ async function renderLeaderboard() {
           : `<span style="color:var(--muted);font-size:0.8rem">→</span>`;
         const liveGWPts = p.liveGWPts || 0;
         const isLiveWeekend = deadlinePassed || isLiveWindow;
-        const showLive = isLiveWeekend;
+        const ukDayLb = new Date().toLocaleDateString('en-GB', {timeZone:'Europe/London', weekday:'long'});
+        const isWeekendDay = ukDayLb === 'Saturday' || ukDayLb === 'Sunday';
+        const showLive = isLiveWeekend && isWeekendDay;
         return `<div class="lb-row ${rankClass(p.rank)}">
           <div class="lb-rank" style="display:flex;align-items:center;gap:2px">
             <span>${p.rank}</span>${arrowStr}
           </div>
-          <div class="lb-name">${isGWLeader?'👑 ':''}${p.name}
+          <div class="lb-name">${isGWLeader?`<span style="font-size:0.62rem;background:rgba(255,213,79,0.15);color:var(--gold);border-radius:3px;padding:1px 5px;margin-right:4px;font-weight:700;letter-spacing:0.03em">👑 GW${gwLeaderGW}</span>`:''}${p.name}
             ${tied?'<span class="tied-badge">TIE</span>':''}
             ${isMe?'<span class="you-badge">YOU</span>':''}
           </div>
@@ -788,8 +790,7 @@ async function renderLeaderboard() {
         </div>`;
       }).join('')}
     </div>
-    ${gwLeaderGW ? '<div style="font-size:0.72rem;color:var(--muted);margin-top:0.6rem;padding:0 0.25rem">👑 GW'+gwLeaderGW+' winner: '+gwLeaders.join(' & ')+'</div>' : ''}
-  `;
+      `;
 
 }
 
@@ -1333,7 +1334,8 @@ async function renderGWView(gw) {
   const section = document.getElementById('fixtures-section');
   section.innerHTML = `<div class="state-box"><div class="spinner"></div><div>Loading GW${gw}…</div></div>`;
 
-  const isNextGW = gw > currentGW;
+  // currentGW is the next upcoming GW (completed+1), so gw >= currentGW means upcoming
+  const isNextGW = gw >= currentGW;
 
   if (isNextGW) {
     // Show next GW predictions view
