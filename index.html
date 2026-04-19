@@ -2561,7 +2561,6 @@ async function renderTracker() {
   const section = document.getElementById('tracker-section');
   section.innerHTML = '<div class="state-box"><div class="spinner"></div><div>Loading…</div></div>';
 
-  // Load Supabase data for GW27+
   const [{data: results},{data: allPreds},{data: allProfiles}] = await Promise.all([
     sb.from('results').select('gameweek,match_key,home_score,away_score,status').eq('status','finished').limit(5000),
     sb.from('predictions').select('user_id,gameweek,match_key,home_score,away_score').limit(10000),
@@ -2571,7 +2570,6 @@ async function renderTracker() {
   const profileMap = {};
   (allProfiles||[]).forEach(p => { profileMap[p.id] = p.player_name; });
 
-  // Build gwPoints: start with hardcoded GW1-26
   const gwPoints = {};
   PLAYERS.forEach(name => {
     const hist = HISTORICAL_GW_POINTS[name] || {};
@@ -2581,7 +2579,6 @@ async function renderTracker() {
     });
   });
 
-  // Add GW27+ from Supabase
   if (results && allPreds) {
     const resultMap = {};
     results.forEach(r => { resultMap[r.gameweek+'_'+r.match_key] = r; });
@@ -2598,75 +2595,148 @@ async function renderTracker() {
   }
 
   const gws = [...new Set(Object.values(gwPoints).flatMap(p=>Object.keys(p)))].map(Number).sort((a,b)=>a-b);
-  if (!gws.length) {
-    section.innerHTML = '<div class="state-box">No data yet.</div>';
-    return;
+  if (!gws.length) { section.innerHTML = '<div class="state-box">No data yet.</div>'; return; }
+
+  const COLORS = ['#00e676','#ffd54f','#ffa726','#ef5350','#64b5f6','#ce93d8','#80cbc4','#ffcc80','#b0bec5','#a1734e'];
+  const N = PLAYERS.length;
+  const W = Math.max(480, gws.length * 32);
+  const H = 300;
+  const PAD = {t:16,b:20,l:4,r:72};
+  const ROW_H = (H - PAD.t - PAD.b) / (N - 1);
+
+  function cumPts(name, upToIdx) {
+    return gws.slice(0, upToIdx+1).reduce((s,g)=>s+(gwPoints[name]?.[g]||0),0);
+  }
+  function getRank(name, gwIdx) {
+    const my = cumPts(name, gwIdx);
+    return PLAYERS.filter(p => cumPts(p, gwIdx) > my).length + 1;
+  }
+  function posY(rank) { return PAD.t + (rank-1)*ROW_H; }
+  function posX(i) { return PAD.l + (i/(gws.length-1||1))*(W-PAD.l-PAD.r); }
+
+  function buildPath(name) {
+    return gws.map((g,i) => {
+      const x = posX(i), y = posY(getRank(name,i));
+      if (i===0) return 'M'+x+','+y;
+      const px = posX(i-0.5), py = posY(getRank(name,i-1));
+      return 'C'+px+','+py+' '+px+','+y+' '+x+','+y;
+    }).join(' ');
   }
 
-  const colors = ['#00e676','#ffd54f','#ffa726','#ef5350','#64b5f6','#ce93d8','#80cbc4','#ffcc80','#b0bec5','#a1734e'];
+  let spotlight = currentPlayerName || null;
 
-  // Build cumulative position data
-  const datasets = PLAYERS.map((name, i) => ({
-    label: name,
-    data: gws.map(gw => {
-      const scores = PLAYERS.map(n => ({
-        name: n,
-        total: gws.filter(g=>g<=gw).reduce((s,g)=>s+(gwPoints[n]?.[g]||0), 0)
-      })).sort((a,b)=>b.total-a.total);
-      return scores.findIndex(s=>s.name===name) + 1;
-    }),
-    borderColor: colors[i % colors.length],
-    backgroundColor: 'transparent',
-    borderWidth: name === currentPlayerName ? 3 : 1.5,
-    pointRadius: gws.length > 20 ? 2 : 3,
-    tension: 0.3
-  }));
+  function renderSVG() {
+    const svg = document.getElementById('tracker-svg');
+    if (!svg) return;
+    svg.innerHTML = '';
 
-  section.innerHTML =
-    '<div class="section-label">Season Position Tracker</div>'+
-    '<div style="background:var(--card);border:1px solid var(--border);border-radius:10px;padding:1rem;overflow-x:auto">'+
-      '<div style="min-width:'+Math.max(320, gws.length * 28)+'px">'+
-        '<canvas id="position-chart"></canvas>'+
-      '</div>'+
-    '</div>'+
-    '<div style="margin-top:0.75rem;font-size:0.72rem;color:var(--muted);text-align:center">Scroll horizontally to see all gameweeks</div>';
+    // Grid lines
+    for (let r=1; r<=N; r++) {
+      const y = posY(r);
+      const line = document.createElementNS('http://www.w3.org/2000/svg','line');
+      line.setAttribute('x1',PAD.l); line.setAttribute('x2',W-PAD.r);
+      line.setAttribute('y1',y); line.setAttribute('y2',y);
+      line.setAttribute('stroke','#1f2e1f'); line.setAttribute('stroke-width','0.5');
+      svg.appendChild(line);
+    }
 
-  setTimeout(() => {
-    const ctx = document.getElementById('position-chart');
-    if (!ctx || !window.Chart) return;
-    const existing = Chart.getChart(ctx);
-    if (existing) existing.destroy();
-    new Chart(ctx, {
-      type: 'line',
-      data: { labels: gws.map(g=>'GW'+g), datasets },
-      options: {
-        responsive: true,
-        maintainAspectRatio: true,
-        scales: {
-          y: {
-            reverse: true, min: 1, max: PLAYERS.length,
-            ticks: { stepSize:1, color:'#6a7d6a', callback: v=>'#'+v },
-            grid: { color:'#1f2e1f' }
-          },
-          x: {
-            ticks: { color:'#6a7d6a', maxRotation: 45, font: { size: 10 } },
-            grid: { color:'#1f2e1f' }
-          }
-        },
-        plugins: {
-          legend: {
-            position: 'top',
-            labels: {
-              color: '#e8f5e9',
-              font: { size: 10 },
-              boxWidth: 10,
-              padding: 8
-            }
-          }
-        }
+    // GW labels
+    gws.forEach((gw,i) => {
+      if (gw===1||gw%5===0||i===gws.length-1) {
+        const t = document.createElementNS('http://www.w3.org/2000/svg','text');
+        t.setAttribute('x',posX(i)); t.setAttribute('y',H-3);
+        t.setAttribute('text-anchor','middle'); t.setAttribute('font-size','9');
+        t.setAttribute('fill','#6a7d6a'); t.textContent='GW'+gw;
+        svg.appendChild(t);
       }
     });
-  }, 150);
+
+    // Lines — dimmed first, spotlight last
+    const order = spotlight ? [...PLAYERS.filter(p=>p!==spotlight), spotlight] : PLAYERS;
+    order.forEach(name => {
+      const idx = PLAYERS.indexOf(name);
+      const color = COLORS[idx % COLORS.length];
+      const isSpot = spotlight===name;
+      const isDim = spotlight && !isSpot;
+
+      const path = document.createElementNS('http://www.w3.org/2000/svg','path');
+      path.setAttribute('d', buildPath(name));
+      path.setAttribute('fill','none');
+      path.setAttribute('stroke', isDim ? '#1f2e1f' : color);
+      path.setAttribute('stroke-width', isSpot ? 3 : isDim ? 1 : 1.5);
+      path.setAttribute('opacity', isDim ? 0.4 : 1);
+      svg.appendChild(path);
+
+      // Start + end dots
+      [0, gws.length-1].forEach(i => {
+        const c = document.createElementNS('http://www.w3.org/2000/svg','circle');
+        c.setAttribute('cx',posX(i)); c.setAttribute('cy',posY(getRank(name,i)));
+        c.setAttribute('r', isSpot ? 5 : 3);
+        c.setAttribute('fill', isDim ? '#141c14' : color);
+        c.setAttribute('stroke', isDim ? '#1f2e1f' : color);
+        c.setAttribute('stroke-width','1');
+        svg.appendChild(c);
+      });
+
+      // End label
+      if (!isDim) {
+        const lastIdx = gws.length-1;
+        const t = document.createElementNS('http://www.w3.org/2000/svg','text');
+        t.setAttribute('x', posX(lastIdx)+8);
+        t.setAttribute('y', posY(getRank(name,lastIdx))+4);
+        t.setAttribute('font-size', isSpot ? 12 : 10);
+        t.setAttribute('font-weight', isSpot ? '500' : '400');
+        t.setAttribute('fill', isSpot ? color : '#6a7d6a');
+        t.textContent = name;
+        svg.appendChild(t);
+      }
+    });
+
+    // Update legend active states
+    document.querySelectorAll('.tracker-legend-item').forEach(el => {
+      el.classList.toggle('tracker-active', el.dataset.name===spotlight);
+    });
+  }
+
+  // Build HTML
+  section.innerHTML =
+    '<div class="section-label">Season Position Tracker</div>'+
+    '<div style="display:flex;gap:0;position:relative">'+
+      // Sticky Y axis
+      '<div style="position:sticky;left:0;z-index:2;background:var(--bg);display:flex;flex-direction:column;justify-content:space-between;padding:'+PAD.t+'px 6px '+PAD.b+'px 0;min-width:28px;flex-shrink:0">'+
+        PLAYERS.map((_,i)=>'<span style="font-family:Bebas Neue,sans-serif;font-size:0.85rem;color:var(--muted);line-height:1">#'+(i+1)+'</span>').join('')+
+      '</div>'+
+      // Scrollable chart
+      '<div style="overflow-x:auto;-webkit-overflow-scrolling:touch;flex:1">'+
+        '<svg id="tracker-svg" viewBox="0 0 '+W+' '+H+'" width="'+W+'" height="'+H+'" role="img" aria-label="Season position tracker bumps chart"></svg>'+
+      '</div>'+
+    '</div>'+
+    // Legend
+    '<div style="display:flex;flex-wrap:wrap;gap:5px 10px;margin-top:0.75rem" id="tracker-legend">'+
+      PLAYERS.map((name,idx)=>
+        '<div class="tracker-legend-item'+(name===spotlight?' tracker-active':'')+'" data-name="'+name+'" '+
+        'style="display:flex;align-items:center;gap:5px;cursor:pointer;padding:3px 8px;border-radius:4px;font-size:0.78rem;color:var(--muted);border:1px solid transparent;transition:all 0.15s">'+
+          '<span style="width:10px;height:10px;border-radius:50%;background:'+COLORS[idx % COLORS.length]+';flex-shrink:0"></span>'+
+          name+
+        '</div>'
+      ).join('')+
+    '</div>'+
+    '<div style="margin-top:0.5rem;font-size:0.68rem;color:var(--muted)">Tap a name to spotlight · Scroll to see all GWs</div>';
+
+  // Legend click handlers
+  document.querySelectorAll('.tracker-legend-item').forEach(el => {
+    el.addEventListener('click', () => {
+      spotlight = spotlight===el.dataset.name ? null : el.dataset.name;
+      renderSVG();
+    });
+  });
+
+  // CSS for active legend items
+  const style = document.createElement('style');
+  style.textContent = '.tracker-legend-item:hover{background:var(--bg3)!important;color:var(--text)!important}.tracker-active{color:var(--text)!important;border-color:var(--border)!important;background:var(--bg3)!important}';
+  document.head.appendChild(style);
+
+  renderSVG();
 }
 </script>
 </body>
