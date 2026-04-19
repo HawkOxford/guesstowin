@@ -1130,17 +1130,18 @@ async function fetchAndRenderFixtures(targetGW) {
       buildLiveResults(liveMatches);
     }
 
-    // If all matches finished, automatically show GW review
+    // If all matches finished, show GW review directly (don't use navigateGW - causes loop)
     const allDone = deadlinePassed && liveMatches.length > 0 &&
       currentMatches.every(m => {
         const home = cleanTeamName(m.homeTeam?.name)||'Home';
         const away = cleanTeamName(m.awayTeam?.name)||'Away';
         const res = liveResults[home+'_'+away];
-        return res && (res.status === 'FINISHED');
+        return res && res.status === 'FINISHED';
       });
 
     if (allDone) {
-      await navigateGW(currentGW);
+      viewingGW = currentGW;
+      await renderGWView(currentGW);
       return;
     }
 
@@ -1160,6 +1161,19 @@ async function fetchAndRenderFixtures(targetGW) {
           document.querySelectorAll('.score-input').forEach(inp => {
             if (inp.value !== '') typed[inp.dataset.key + '|' + inp.dataset.side] = inp.value;
           });
+          // Re-check if all done during refresh
+          const refreshAllDone = live.length > 0 && currentMatches.every(m => {
+            const home = cleanTeamName(m.homeTeam?.name)||'Home';
+            const away = cleanTeamName(m.awayTeam?.name)||'Away';
+            const res = liveResults[home+'_'+away];
+            return res && res.status === 'FINISHED';
+          });
+          if (refreshAllDone) {
+            viewingGW = currentGW;
+            clearInterval(refreshTimer);
+            await renderGWView(currentGW);
+            return;
+          }
           renderMatchesView(allPredictions[currentPlayerName]||{}, deadline, live, currentMatches);
           document.querySelectorAll('.score-input').forEach(inp => {
             const v = typed[inp.dataset.key + '|' + inp.dataset.side];
