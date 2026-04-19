@@ -1036,6 +1036,11 @@ async function estimateGWNumber(matches) {
 
     if (!completedGWs.length) return 1;
     const maxCompleted = Math.max(...completedGWs);
+    // Don't advance to next GW until Monday UK time
+    const ukDayEst = new Date().toLocaleDateString('en-GB', {timeZone:'Europe/London', weekday:'long'});
+    if (ukDayEst === 'Saturday' || ukDayEst === 'Sunday') {
+      return Math.min(maxCompleted, 38); // stay on current GW over the weekend
+    }
     return Math.min(maxCompleted + 1, 38);
   } catch(e) {
     return 1;
@@ -1289,35 +1294,17 @@ function buildLiveResults(liveMatches) {
 // ── GW Navigation ────────────────────────────────────────────────────────────
 
 function gwNavButtons(gw) {
-  // Check if previous GW has results in Supabase
   const prevGW = gw - 1;
   const nextGW = gw + 1;
-  const now = new Date();
-
-  // Next GW available after Sunday midnight of current GW weekend
-  // Use Sunday 23:59 of current weekend as the gate
-  const nextGWAvailable = (() => {
-    if (!currentMatches.length) return false;
-    const dates = currentMatches.map(m => ukDateStr(m.utcDate)).sort();
-    const lastDate = dates[dates.length - 1];
-    const [y, mo, d] = lastDate.split('-').map(Number);
-    // Use UK midnight - construct as UTC equivalent of 23:59 UK time
-    // In BST (summer) UK is UTC+1, in GMT (winter) UTC+0
-    // Safest: check if it's past 23:59 on the last date in UK timezone
-    const ukMidnightCheck = new Date().toLocaleDateString('en-GB', {timeZone:'Europe/London'}) !== lastDate.split('-').reverse().join('/');
-    const afterMidnight = ukMidnightCheck || (() => {
-      const ukNow = new Date().toLocaleString('en-GB', {timeZone:'Europe/London'});
-      const [datePart, timePart] = ukNow.split(', ');
-      const [dd, mm, yyyy] = datePart.split('/');
-      const curDateStr = yyyy+'-'+mm.padStart(2,'0')+'-'+dd.padStart(2,'0');
-      return curDateStr > lastDate;
-    })();
-    return afterMidnight;
-  })();
-
+  // Next GW button only available Mon-Fri — locked on Sat/Sun until midnight
+  const ukDayNav = new Date().toLocaleDateString('en-GB', {timeZone:'Europe/London', weekday:'long'});
+  const isWeekendNav = ukDayNav === 'Saturday' || ukDayNav === 'Sunday';
+  // Disable next if: we're on the weekend and it would go beyond currentGW,
+  // OR if it would skip more than one GW ahead
+  const nextDisabled = (nextGW > currentGW && isWeekendNav) || nextGW > currentGW + 1;
   return `
     <button class="gw-nav-btn" ${prevGW < 1 ? 'disabled' : ''} onclick="navigateGW(${prevGW})">← GW${prevGW}</button>
-    <button class="gw-nav-btn" ${nextGW > currentGW && !nextGWAvailable ? 'disabled' : nextGW > currentGW + 1 ? 'disabled' : ''} onclick="navigateGW(${nextGW})">GW${nextGW} →</button>
+    <button class="gw-nav-btn" ${nextDisabled ? 'disabled' : ''} onclick="navigateGW(${nextGW})">GW${nextGW} →</button>
   `;
 }
 
