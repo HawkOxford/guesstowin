@@ -63,7 +63,7 @@ async function renderSeasonReview() {
 
   const [{ data: results }, { data: allPreds }, { data: allProfiles }] = await Promise.all([
     sb.from('results').select('gameweek,match_key,home_score,away_score,status').eq('status','finished'),
-    sb.from('predictions').select('user_id,gameweek,match_key,home_score,away_score'),
+    sb.from('predictions').select('user_id,gameweek,match_key,home_score,away_score').limit(10000),
     sb.from('profiles').select('id,player_name')
   ]);
 
@@ -809,7 +809,7 @@ async function renderLeaderboard() {
   // Load all Supabase data + live predictions for current GW in parallel
   const [{data: results},{data: allPreds},{data: allProfiles}] = await Promise.all([
     sb.from('results').select('gameweek,match_key,home_score,away_score,status').eq('status','finished'),
-    sb.from('predictions').select('user_id,gameweek,match_key,home_score,away_score'),
+    sb.from('predictions').select('user_id,gameweek,match_key,home_score,away_score').limit(10000),
     sb.from('profiles').select('id,player_name')
   ]);
   const profileMap={};
@@ -1232,7 +1232,7 @@ async function estimateGWNumber(matches) {
     });
 
     // Determine expected fixture count per GW from predictions table
-    const { data: predRows } = await sb.from('predictions').select('gameweek,match_key');
+    const { data: predRows } = await sb.from('predictions').select('gameweek,match_key').limit(10000);
     const fixtureCounts = {};
     (predRows || []).forEach(p => {
       const key = p.match_key.replace(/^\d+_/, '');
@@ -1265,7 +1265,7 @@ async function estimateGWNumber(matches) {
 async function loadAllPredictions(gw) {
   if (!gw) return {};
   const [{data:preds,error:predErr},{data:profiles,error:profErr}] = await Promise.all([
-    sb.from('predictions').select('user_id,match_key,home_score,away_score').eq('gameweek',gw),
+    sb.from('predictions').select('user_id,match_key,home_score,away_score').eq('gameweek',gw).limit(500),
     sb.from('profiles').select('id,player_name')
   ]);
   if(predErr||profErr){console.error(predErr||profErr);return{};}
@@ -1315,7 +1315,7 @@ async function syncResultsToSupabase(gw, liveMatches) {
   // Look up the correct gameweek for each match from the predictions table
   // Each fixture is unique per season so we filter to currentGW only
   const keys = matchData.map(m => m.key);
-  const { data: predRows } = await sb.from('predictions').select('gameweek,match_key')
+  const { data: predRows } = await sb.from('predictions').select('gameweek,match_key').limit(10000)
     .in('match_key', keys)
     .eq('gameweek', currentGW);
 
@@ -1618,7 +1618,7 @@ async function renderGWView(gw) {
   // Past GW review
   const [{data:results},{data:preds},{data:profiles}] = await Promise.all([
     sb.from('results').select('*').eq('gameweek', gw),
-    sb.from('predictions').select('user_id,match_key,home_score,away_score').eq('gameweek', gw),
+    sb.from('predictions').select('user_id,match_key,home_score,away_score').eq('gameweek',gw).limit(500),
     sb.from('profiles').select('id,player_name')
   ]);
 
@@ -2211,7 +2211,7 @@ async function renderAdmin() {
     { data: results }
   ] = await Promise.all([
     sb.from('profiles').select('id,player_name'),
-    sb.from('predictions').select('user_id,gameweek,match_key,home_score,away_score'),
+    sb.from('predictions').select('user_id,gameweek,match_key,home_score,away_score').limit(10000),
     sb.from('results').select('gameweek,match_key,home_score,away_score,status').eq('status','finished')
   ]);
 
