@@ -1130,17 +1130,17 @@ async function fetchAndRenderFixtures(targetGW) {
       buildLiveResults(liveMatches);
     }
 
-    // If all matches are finished, show GW review instead of live view
-    const allFinished = deadlinePassed && currentMatches.length > 0 &&
+    // If all matches finished, automatically show GW review
+    const allDone = deadlinePassed && liveMatches.length > 0 &&
       currentMatches.every(m => {
         const home = cleanTeamName(m.homeTeam?.name)||'Home';
         const away = cleanTeamName(m.awayTeam?.name)||'Away';
         const res = liveResults[home+'_'+away];
-        return res && res.status === 'FINISHED';
+        return res && (res.status === 'FINISHED');
       });
 
-    if (allFinished) {
-      await renderGWView(currentGW);
+    if (allDone) {
+      await navigateGW(currentGW);
       return;
     }
 
@@ -1221,8 +1221,11 @@ async function renderGWView(gw) {
   const section = document.getElementById('fixtures-section');
   section.innerHTML = `<div class="state-box"><div class="spinner"></div><div>Loading GW${gw}…</div></div>`;
 
-  // currentGW is the next upcoming GW (completed+1), so gw >= currentGW means upcoming
-  const isNextGW = gw >= currentGW;
+  // A GW is "next" (upcoming predictions) if it's beyond currentGW
+  // OR if it equals currentGW and no results exist for it yet in Supabase
+  // On weekends currentGW=maxCompleted, so gw===currentGW with results = past review
+  const { data: gwResultCheck } = await sb.from('results').select('gameweek').eq('gameweek', gw).limit(1);
+  const isNextGW = gw > currentGW || (gw === currentGW && (!gwResultCheck || !gwResultCheck.length));
 
   if (isNextGW) {
     // Show next GW predictions view
