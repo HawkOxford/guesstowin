@@ -12,10 +12,7 @@
 async function checkSeasonEnded() {
   try {
     const { data } = await sb.from('app_settings').select('value').eq('key','season_ended').single();
-    if (data?.value === 'true') {
-      showSeasonReviewTab();
-    }
-    // Update admin button label if present
+    if (data?.value === 'true') showSeasonReviewTab();
     const btn = document.getElementById('season-toggle-btn');
     if (btn) btn.textContent = data?.value === 'true' ? '🏅 Disable Season Review tab' : '🏅 Enable Season Review tab';
   } catch(e) { console.warn('checkSeasonEnded failed:', e); }
@@ -23,8 +20,7 @@ async function checkSeasonEnded() {
 
 async function toggleSeasonEnded() {
   const { data } = await sb.from('app_settings').select('value').eq('key','season_ended').single();
-  const current = data?.value === 'true';
-  const newVal = current ? 'false' : 'true';
+  const newVal = data?.value === 'true' ? 'false' : 'true';
   await sb.from('app_settings').update({ value: newVal }).eq('key','season_ended');
   const btn = document.getElementById('season-toggle-btn');
   if (btn) btn.textContent = newVal === 'true' ? '🏅 Disable Season Review tab' : '🏅 Enable Season Review tab';
@@ -36,13 +32,12 @@ async function toggleSeasonEnded() {
     const existingBtn = document.getElementById('season-review-tab-btn');
     if (existingTab) existingTab.remove();
     if (existingBtn) existingBtn.remove();
-    // Switch back to scores tab
     switchTab('scores', document.querySelector('.tab-btn'));
   }
 }
 
 function showSeasonReviewTab() {
-  if (document.getElementById('tab-season-review')) return; // already shown
+  if (document.getElementById('tab-season-review')) return;
   const tabBtn = document.createElement('button');
   tabBtn.className = 'tab-btn';
   tabBtn.id = 'season-review-tab-btn';
@@ -58,8 +53,6 @@ function showSeasonReviewTab() {
 }
 
 // ── Season Review ─────────────────────────────────────────────────────────────
-
-// calculateSeasonReview replaced by toggleSeasonEnded + showSeasonReviewTab
 
 async function renderSeasonReview() {
   const section = document.querySelector('#tab-season-review .main');
@@ -102,16 +95,16 @@ async function renderSeasonReview() {
 
   const weeklyWinnings = {};
   PLAYERS.forEach(name => {
-    let extraPrize = 0;
+    let prize = 0;
     Object.entries(gwWinners).forEach(([gw,winners]) => {
-      if (winners.includes(name)) extraPrize += 10/winners.length;
+      if (winners.includes(name)) prize += 10/winners.length;
     });
-    weeklyWinnings[name] = BASE_WEEKLY_PRIZE[name] + extraPrize;
+    weeklyWinnings[name] = prize;
   });
 
   const totals = PLAYERS.map(name => {
     const pts = Object.values(gwPoints[name]||{}).reduce((a,b)=>a+b,0);
-    return { name, total: BASE_SCORES[name]+pts };
+    return { name, total: pts };
   }).sort((a,b)=>b.total-a.total);
 
   // Season pot shares — handle ties spanning prize positions
@@ -151,6 +144,10 @@ async function renderSeasonReview() {
   }
 
   const rankColor = r => r===1?'var(--gold)':r===2?'var(--silver)':r===3?'var(--bronze)':'var(--text)';
+
+  // Store gwPoints for use by player review
+  window._seasonGwPoints = gwPoints;
+  window._seasonGwWinners = gwWinners;
 
   section.innerHTML =
     '<div class="section-label">Season Summary · GW1–GW'+totalGWs+'</div>'+
@@ -199,6 +196,155 @@ async function renderSeasonReview() {
           '<span style="font-family:Bebas Neue,sans-serif;font-size:1.3rem;color:var(--green)">£'+t.amount.toFixed(2)+'</span>'+
         '</div>'
       ).join('') : '<div style="padding:1rem;color:var(--muted);font-size:0.85rem">No transfers needed.</div>')+
+    '</div>'+
+    '<div class="section-label">Review Your Season</div>'+
+    '<div style="display:flex;flex-wrap:wrap;gap:0.6rem;margin-bottom:2rem">'+
+      PLAYERS.map(name =>
+        '<button class="gw-nav-btn" onclick="showPlayerSeasonReview(' + "'" + name + "'" + ')" style="font-size:0.8rem;padding:0.4rem 1rem">'+name+'</button>'
+      ).join('')+
+    '</div>'+
+    '<div id="player-season-review"></div>';
+}
+
+async function showPlayerSeasonReview(playerName) {
+  const section = document.getElementById('player-season-review');
+  section.innerHTML = '<div class="state-box"><div class="spinner"></div></div>';
+
+  const gwPoints = window._seasonGwPoints || {};
+  const gwWinners = window._seasonGwWinners || {};
+
+  // Get all GWs with data, sorted
+  const allGWs = [...new Set(
+    Object.values(gwPoints).flatMap(p => Object.keys(p).map(Number))
+  )].sort((a,b)=>a-b);
+
+  if (!allGWs.length) {
+    section.innerHTML = '<div class="state-box">No data available.</div>';
+    return;
+  }
+
+  // Build cumulative totals for all players to determine rankings per GW
+  const playerPts = playerName;
+  const gwData = allGWs.map(gw => {
+    const pts = gwPoints[playerName]?.[gw] || 0;
+    // Rank after this GW
+    const cumTotals = PLAYERS.map(n => ({
+      name: n,
+      total: allGWs.filter(g=>g<=gw).reduce((s,g)=>s+(gwPoints[n]?.[g]||0),0)
+    })).sort((a,b)=>b.total-a.total);
+    let rank = 1;
+    for (let i=0; i<cumTotals.length; i++) {
+      if (i>0 && cumTotals[i].total < cumTotals[i-1].total) rank = i+1;
+      if (cumTotals[i].name === playerName) break;
+    }
+    const cumPts = allGWs.filter(g=>g<=gw).reduce((s,g)=>s+(gwPoints[playerName]?.[g]||0),0);
+    const wonPrize = gwWinners[gw] && gwWinners[gw].includes(playerName);
+    return { gw, pts, rank, cumPts, wonPrize };
+  });
+
+  const maxPts = Math.max(...gwData.map(d=>d.pts), 1);
+  const totalPts = gwData.reduce((s,d)=>s+d.pts,0);
+  const bestGW = gwData.reduce((a,b)=>b.pts>a.pts?b:a);
+  const worstGW = gwData.filter(d=>d.pts>0).reduce((a,b)=>b.pts<a.pts?b:a, gwData[0]);
+  const prizesWon = gwData.filter(d=>d.wonPrize).length;
+  const bestRank = Math.min(...gwData.map(d=>d.rank));
+  const worstRank = Math.max(...gwData.map(d=>d.rank));
+  const rankSuffix = r => r===1?'st':r===2?'nd':r===3?'rd':'th';
+  const finalRank = gwData[gwData.length-1]?.rank || '-';
+
+  // Build SVG charts
+  const chartW = 600, chartH = 140, padL = 32, padR = 16, padT = 10, padB = 24;
+  const w = chartW - padL - padR;
+  const h = chartH - padT - padB;
+  const xStep = w / (allGWs.length - 1 || 1);
+
+  // Bar chart - pts per GW
+  const barW = Math.max(4, xStep * 0.6);
+  const bars = gwData.map((d,i) => {
+    const bh = d.pts === 0 ? 2 : (d.pts / maxPts) * h;
+    const x = padL + i * xStep - barW/2;
+    const y = padT + h - bh;
+    const col = d.wonPrize ? 'var(--gold)' : 'var(--green)';
+    return '<rect x="'+x+'" y="'+y+'" width="'+barW+'" height="'+bh+'" fill="'+col+'" rx="2" opacity="0.85"/>'+
+      (d.wonPrize ? '<text x="'+(padL+i*xStep)+'" y="'+(y-3)+'" text-anchor="middle" font-size="8" fill="var(--gold)">£</text>' : '');
+  }).join('');
+
+  // Y axis labels for bar chart
+  const yLabels = [0, Math.round(maxPts/2), maxPts].map(v => {
+    const y = padT + h - (v/maxPts)*h;
+    return '<text x="'+(padL-4)+'" y="'+(y+4)+'" text-anchor="end" font-size="9" fill="var(--muted)">'+v+'</text>';
+  }).join('');
+
+  // X axis labels (every 5 GWs)
+  const xLabels = gwData.filter((_,i)=>i===0||gwData[i].gw%5===0||i===gwData.length-1).map((d,_,arr) => {
+    const i = gwData.indexOf(d);
+    return '<text x="'+(padL+i*xStep)+'" y="'+(chartH-6)+'" text-anchor="middle" font-size="9" fill="var(--muted)">'+d.gw+'</text>';
+  }).join('');
+
+  const barSVG = '<svg viewBox="0 0 '+chartW+' '+chartH+'" xmlns="http://www.w3.org/2000/svg" style="width:100%;max-width:'+chartW+'px">'+
+    '<line x1="'+padL+'" y1="'+padT+'" x2="'+padL+'" y2="'+(padT+h)+'" stroke="var(--border)" stroke-width="1"/>'+
+    '<line x1="'+padL+'" y1="'+(padT+h)+'" x2="'+(padL+w)+'" y2="'+(padT+h)+'" stroke="var(--border)" stroke-width="1"/>'+
+    yLabels + bars + xLabels+
+  '</svg>';
+
+  // Line chart - position per GW (inverted: 1st is top)
+  const rankMin = 1, rankMax = PLAYERS.length;
+  const rankY = r => padT + ((r - rankMin) / (rankMax - rankMin)) * h;
+  const points = gwData.map((d,i) => (padL + i*xStep)+','+(rankY(d.rank))).join(' ');
+  const rankYLabels = [1, 5, 10].map(v => {
+    const y = rankY(v);
+    return '<text x="'+(padL-4)+'" y="'+(y+4)+'" text-anchor="end" font-size="9" fill="var(--muted)">'+v+'</text>'+
+      '<line x1="'+padL+'" y1="'+y+'" x2="'+(padL+w)+'" y2="'+y+'" stroke="var(--border)" stroke-width="0.5" stroke-dasharray="3,3"/>';
+  }).join('');
+  const rankDots = gwData.map((d,i) => {
+    const cx = padL+i*xStep, cy = rankY(d.rank);
+    const col = d.rank===1?'var(--gold)':d.rank<=3?'var(--green)':'var(--muted)';
+    return '<circle cx="'+cx+'" cy="'+cy+'" r="3" fill="'+col+'"/>';
+  }).join('');
+
+  const lineSVG = '<svg viewBox="0 0 '+chartW+' '+chartH+'" xmlns="http://www.w3.org/2000/svg" style="width:100%;max-width:'+chartW+'px">'+
+    '<line x1="'+padL+'" y1="'+padT+'" x2="'+padL+'" y2="'+(padT+h)+'" stroke="var(--border)" stroke-width="1"/>'+
+    '<line x1="'+padL+'" y1="'+(padT+h)+'" x2="'+(padL+w)+'" y2="'+(padT+h)+'" stroke="var(--border)" stroke-width="1"/>'+
+    rankYLabels+
+    '<polyline points="'+points+'" fill="none" stroke="var(--green)" stroke-width="2" stroke-linejoin="round"/>'+
+    rankDots + xLabels+
+  '</svg>';
+
+  section.innerHTML =
+    '<div style="background:var(--card);border:1px solid var(--border);border-radius:10px;padding:1.25rem;margin-bottom:1.5rem">'+
+      '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:1rem;flex-wrap:wrap;gap:0.5rem">'+
+        '<div style="font-family:Bebas Neue,sans-serif;font-size:1.6rem;color:var(--green)">'+playerName+''s Season</div>'+
+        '<button class="gw-nav-btn" onclick="document.getElementById('player-season-review').innerHTML=''" style="font-size:0.75rem">✕ Close</button>'+
+      '</div>'+
+      '<div style="display:flex;gap:1.5rem;flex-wrap:wrap;margin-bottom:1.25rem">'+
+        '<div class="pts-stat"><div class="pts-stat-num">'+totalPts+'</div><div class="pts-stat-label">Total pts</div></div>'+
+        '<div class="pts-stat"><div class="pts-stat-num">'+finalRank+'<span style="font-size:1rem">'+rankSuffix(finalRank)+'</span></div><div class="pts-stat-label">Final position</div></div>'+
+        '<div class="pts-stat"><div class="pts-stat-num" style="color:var(--gold)">'+bestGW.pts+'</div><div class="pts-stat-label">Best GW (GW'+bestGW.gw+')</div></div>'+
+        '<div class="pts-stat"><div class="pts-stat-num" style="color:var(--amber)">'+prizesWon+'</div><div class="pts-stat-label">Weeks won</div></div>'+
+        '<div class="pts-stat"><div class="pts-stat-num">'+bestRank+'<span style="font-size:1rem">'+rankSuffix(bestRank)+'</span></div><div class="pts-stat-label">Best rank</div></div>'+
+      '</div>'+
+      '<div style="font-size:0.65rem;font-weight:700;letter-spacing:0.15em;text-transform:uppercase;color:var(--green);margin-bottom:0.5rem">Points per gameweek <span style="color:var(--gold);font-weight:400">£ = weekly winner</span></div>'+
+      '<div style="background:var(--bg3);border-radius:6px;padding:0.75rem;overflow-x:auto">'+barSVG+'</div>'+
+      '<div style="font-size:0.65rem;font-weight:700;letter-spacing:0.15em;text-transform:uppercase;color:var(--green);margin:1rem 0 0.5rem">League position by gameweek</div>'+
+      '<div style="background:var(--bg3);border-radius:6px;padding:0.75rem;overflow-x:auto">'+lineSVG+'</div>'+
+      '<div style="margin-top:1rem;overflow-x:auto">'+
+        '<table class="pred-table" style="min-width:400px">'+
+          '<thead><tr>'+
+            '<th>GW</th><th>Pts</th><th>Cumulative</th><th>Position</th><th>Prize</th>'+
+          '</tr></thead>'+
+          '<tbody>'+
+            gwData.map(d =>
+              '<tr>'+
+                '<td style="text-align:center;color:var(--muted)">GW'+d.gw+'</td>'+
+                '<td style="text-align:center;font-family:Bebas Neue,sans-serif;font-size:1.1rem;color:'+(d.pts>=9?'var(--green)':d.pts>=6?'var(--amber)':'var(--text)')+'">'+d.pts+'</td>'+
+                '<td style="text-align:center;color:var(--muted)">'+d.cumPts+'</td>'+
+                '<td style="text-align:center;font-weight:600;color:'+(d.rank===1?'var(--gold)':d.rank<=3?'var(--green)':'var(--text)')+'">'+d.rank+rankSuffix(d.rank)+'</td>'+
+                '<td style="text-align:center">'+(d.wonPrize?'<span style="color:var(--gold)">🏆 £'+(10/gwWinners[d.gw].length).toFixed(2)+'</span>':'-')+'</td>'+
+              '</tr>'
+            ).join('')+
+          '</tbody>'+
+        '</table>'+
+      '</div>'+
     '</div>';
 }
 
@@ -516,15 +662,7 @@ const sb = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 
 const PLAYERS = ['Jake','Glurk','Josh ⭐','Richard ⭐','Teflon','Alex','Gaz ⭐','Liam','Craig','Marcus'];
 
-// GW26 hardcoded base scores — new GWs are added on top from Supabase
-const BASE_SCORES = {
-  'Jake': 153, 'Glurk': 154, 'Josh ⭐': 143, 'Richard ⭐': 159,
-  'Teflon': 147, 'Alex': 149, 'Gaz ⭐': 142, 'Liam': 138, 'Craig': 136, 'Marcus': 159
-};
-const BASE_WEEKLY_PRIZE = {
-  'Jake': 16.67, 'Glurk': 33.33, 'Josh ⭐': 20, 'Richard ⭐': 38.33,
-  'Teflon': 48.33, 'Alex': 16.67, 'Gaz ⭐': 30, 'Liam': 3.33, 'Craig': 15, 'Marcus': 38.33
-};
+// Points and prize money are now fully derived from Supabase (GW1-38)
 
 const ABBREV_MAP = {
   'Arsenal':'ARS','Bournemouth':'BOU','Brentford':'BRE','Brighton':'BHA',
@@ -757,7 +895,7 @@ async function renderLeaderboard() {
   const baseTotals = PLAYERS.map(name => {
     const prevGWs = Object.entries(gwPoints[name]||{}).filter(([gw]) => parseInt(gw) < (currentGW||999));
     const prevPts = prevGWs.reduce((a,[,b])=>a+b,0);
-    return { name, total: BASE_SCORES[name] + prevPts };
+    return { name, total: prevPts };
   }).sort((a,b)=>b.total-a.total);
   const prevRankMap = {};
   let prevRank = 1;
@@ -770,18 +908,18 @@ async function renderLeaderboard() {
   // Calculate totals AFTER live overlay is applied
   const totals = PLAYERS.map(name => {
     const supabasePts = Object.values(gwPoints[name]||{}).reduce((a,b)=>a+b,0);
-    const total = BASE_SCORES[name] + supabasePts;
+    const total = supabasePts;
     const liveGWPts = gwPoints[name]?.[currentGW] || 0;
     // Base total without current GW live points (for +N display)
     const prevGWPts = Object.entries(gwPoints[name]||{})
       .filter(([gw]) => parseInt(gw) < (currentGW||999))
       .reduce((a,[,b])=>a+b,0);
-    const baseTotal = BASE_SCORES[name] + prevGWPts;
+    const baseTotal = prevGWPts;
     let extraPrize = 0;
     Object.entries(gwWinners).forEach(([gw,winners]) => {
       if(winners.includes(name)) extraPrize += 10/winners.length;
     });
-    return { name, total, baseTotal, liveGWPts, weekly: BASE_WEEKLY_PRIZE[name] + extraPrize };
+    return { name, total, baseTotal, liveGWPts, weekly: extraPrize };
   }).sort((a,b)=>b.total-a.total);
 
   // Assign ranks
@@ -845,7 +983,7 @@ async function renderLeaderboard() {
     const datasets = PLAYERS.map((name,i) => ({
       label: name,
       data: gws.map(gw => {
-        const scores = PLAYERS.map(n => ({name:n,total:BASE_SCORES[n]+gws.filter(g=>g<=gw).reduce((s,g)=>s+(gwPoints[n]?.[g]||0),0)})).sort((a,b)=>b.total-a.total);
+        const scores = PLAYERS.map(n => ({name:n,total:gws.filter(g=>g<=gw).reduce((s,g)=>s+(gwPoints[n]?.[g]||0),0)})).sort((a,b)=>b.total-a.total);
         return scores.findIndex(s=>s.name===name)+1;
       }),
       borderColor: colors[i%colors.length],
@@ -1081,11 +1219,10 @@ function formatMatchTime(utcDate) {
 }
 
 async function estimateGWNumber(matches) {
-  const BASE_GW = 26;
   try {
     const { data: resultRows } = await sb.from('results').select('gameweek,match_key').eq('status', 'finished');
-    const validRows = (resultRows || []).filter(r => r.gameweek >= 27 && r.gameweek <= 38);
-    if (!validRows.length) return BASE_GW + 1;
+    const validRows = (resultRows || []).filter(r => r.gameweek >= 1 && r.gameweek <= 38);
+    if (!validRows.length) return 1;
 
     // Count unique finished results per GW
     const resultCounts = {};
@@ -1116,11 +1253,11 @@ async function estimateGWNumber(matches) {
       return resultCount >= expectedCount;
     });
 
-    if (!completedGWs.length) return BASE_GW + 1;
+    if (!completedGWs.length) return 1;
     const maxCompleted = Math.max(...completedGWs);
     return Math.min(maxCompleted + 1, 38);
   } catch(e) {
-    return BASE_GW + 1;
+    return 1;
   }
 }
 
@@ -1196,7 +1333,7 @@ async function syncResultsToSupabase(gw, liveMatches) {
 
   // Only write rows where we found a matching gameweek in predictions, and GW is valid (27-38)
   const rows = matchData
-    .filter(m => keyToGW[m.key] && keyToGW[m.key] >= 27 && keyToGW[m.key] <= 38)
+    .filter(m => keyToGW[m.key] && keyToGW[m.key] >= 1 && keyToGW[m.key] <= 38)
     .map(m => ({
       gameweek: keyToGW[m.key],
       match_key: m.key,
@@ -1388,7 +1525,7 @@ function gwNavButtons(gw) {
   })();
 
   return `
-    <button class="gw-nav-btn" ${prevGW < 27 ? 'disabled' : ''} onclick="navigateGW(${prevGW})">← GW${prevGW}</button>
+    <button class="gw-nav-btn" ${prevGW < 1 ? 'disabled' : ''} onclick="navigateGW(${prevGW})">← GW${prevGW}</button>
     <button class="gw-nav-btn" ${nextGW > currentGW && !nextGWAvailable ? 'disabled' : nextGW > currentGW + 1 ? 'disabled' : ''} onclick="navigateGW(${nextGW})">GW${nextGW} →</button>
   `;
 }
@@ -1508,7 +1645,7 @@ async function renderGWView(gw) {
     resultMap[key] = {home: r.home_score, away: r.away_score, status: r.status};
   });
 
-  const gwDateLabel = gw === 27 ? '11 / 12 Apr 2026' : '';
+  const gwDateLabel = '';
 
   // Calculate GW points per player
   const gwScores = PLAYERS.map(name => {
@@ -2244,11 +2381,11 @@ async function renderAdmin() {
           ${PLAYERS.map(name => {
             const gwPts = gwPoints[name] || {};
             const supabasePts = Object.values(gwPts).reduce((a,b)=>a+b,0);
-            const total = BASE_SCORES[name] + supabasePts;
+            const total = supabasePts;
             return `<tr>
               <td style="padding:0.5rem 1rem;font-weight:500;border-bottom:1px solid rgba(31,46,31,0.3)">${name}</td>
               ${allGWs.map(gw => `<td style="padding:0.5rem 0.75rem;text-align:center;border-bottom:1px solid rgba(31,46,31,0.3);color:${gwPts[gw]?'var(--green)':'var(--muted)'}">${gwPts[gw]??'–'}</td>`).join('')}
-              <td style="padding:0.5rem 0.75rem;text-align:center;border-bottom:1px solid rgba(31,46,31,0.3);color:var(--muted)">${BASE_SCORES[name]}</td>
+              <td style="padding:0.5rem 0.75rem;text-align:center;border-bottom:1px solid rgba(31,46,31,0.3);color:var(--muted)">—</td>
               <td style="padding:0.5rem 0.75rem;text-align:center;border-bottom:1px solid rgba(31,46,31,0.3);font-family:'Bebas Neue',sans-serif;font-size:1.1rem;color:var(--green)">${total}</td>
             </tr>`;
           }).join('')}
