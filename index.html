@@ -62,7 +62,7 @@ async function renderSeasonReview() {
   const paidInPerPlayer = totalGWs * 2;
 
   const [{ data: results }, { data: allPreds }, { data: allProfiles }] = await Promise.all([
-    sb.from('results').select('gameweek,match_key,home_score,away_score,status').eq('status','finished'),
+    sb.from('results').select('gameweek,match_key,home_score,away_score,status').eq('status','finished').limit(5000),
     sb.from('predictions').select('user_id,gameweek,match_key,home_score,away_score').limit(10000),
     sb.from('profiles').select('id,player_name')
   ]);
@@ -808,7 +808,7 @@ async function renderLeaderboard() {
 
   // Load all Supabase data + live predictions for current GW in parallel
   const [{data: results},{data: allPreds},{data: allProfiles}] = await Promise.all([
-    sb.from('results').select('gameweek,match_key,home_score,away_score,status').eq('status','finished'),
+    sb.from('results').select('gameweek,match_key,home_score,away_score,status').eq('status','finished').limit(5000),
     sb.from('predictions').select('user_id,gameweek,match_key,home_score,away_score').limit(10000),
     sb.from('profiles').select('id,player_name')
   ]);
@@ -1220,7 +1220,7 @@ function formatMatchTime(utcDate) {
 
 async function estimateGWNumber(matches) {
   try {
-    const { data: resultRows } = await sb.from('results').select('gameweek,match_key').eq('status', 'finished');
+    const { data: resultRows } = await sb.from('results').select('gameweek,match_key').eq('status', 'finished').limit(5000);
     const validRows = (resultRows || []).filter(r => r.gameweek >= 1 && r.gameweek <= 38);
     if (!validRows.length) return 1;
 
@@ -2212,7 +2212,7 @@ async function renderAdmin() {
   ] = await Promise.all([
     sb.from('profiles').select('id,player_name'),
     sb.from('predictions').select('user_id,gameweek,match_key,home_score,away_score').limit(10000),
-    sb.from('results').select('gameweek,match_key,home_score,away_score,status').eq('status','finished')
+    sb.from('results').select('gameweek,match_key,home_score,away_score,status').eq('status','finished').limit(5000)
   ]);
 
   const profileMap = {};
