@@ -7,14 +7,42 @@
 <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=DM+Sans:wght@300;400;500;700&display=swap" rel="stylesheet">
 <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><rect width='100' height='100' rx='20' fill='%230a0f0a'/><text y='72' x='50' text-anchor='middle' font-size='60' font-family='Arial Black,sans-serif' fill='%2300e676'>G</text></svg>">
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2">
-// ── Season Review ─────────────────────────────────────────────────────────────
+// ── Season ended flag ─────────────────────────────────────────────────────────
 
-function calculateSeasonReview() {
-  if (!currentGW) { alert('GW not loaded yet — please wait and try again.'); return; }
-  const existingTab = document.getElementById('tab-season-review');
-  const existingBtn = document.getElementById('season-review-tab-btn');
-  if (existingTab) existingTab.remove();
-  if (existingBtn) existingBtn.remove();
+async function checkSeasonEnded() {
+  try {
+    const { data } = await sb.from('app_settings').select('value').eq('key','season_ended').single();
+    if (data?.value === 'true') {
+      showSeasonReviewTab();
+    }
+    // Update admin button label if present
+    const btn = document.getElementById('season-toggle-btn');
+    if (btn) btn.textContent = data?.value === 'true' ? '🏅 Disable Season Review tab' : '🏅 Enable Season Review tab';
+  } catch(e) { console.warn('checkSeasonEnded failed:', e); }
+}
+
+async function toggleSeasonEnded() {
+  const { data } = await sb.from('app_settings').select('value').eq('key','season_ended').single();
+  const current = data?.value === 'true';
+  const newVal = current ? 'false' : 'true';
+  await sb.from('app_settings').update({ value: newVal }).eq('key','season_ended');
+  const btn = document.getElementById('season-toggle-btn');
+  if (btn) btn.textContent = newVal === 'true' ? '🏅 Disable Season Review tab' : '🏅 Enable Season Review tab';
+  if (newVal === 'true') {
+    showSeasonReviewTab();
+    renderSeasonReview();
+  } else {
+    const existingTab = document.getElementById('tab-season-review');
+    const existingBtn = document.getElementById('season-review-tab-btn');
+    if (existingTab) existingTab.remove();
+    if (existingBtn) existingBtn.remove();
+    // Switch back to scores tab
+    switchTab('scores', document.querySelector('.tab-btn'));
+  }
+}
+
+function showSeasonReviewTab() {
+  if (document.getElementById('tab-season-review')) return; // already shown
   const tabBtn = document.createElement('button');
   tabBtn.className = 'tab-btn';
   tabBtn.id = 'season-review-tab-btn';
@@ -26,9 +54,12 @@ function calculateSeasonReview() {
   tabContent.className = 'tab-content';
   tabContent.innerHTML = '<div class="main"><div class="state-box"><div class="spinner"></div><div>Calculating…</div></div></div>';
   document.getElementById('app-screen').appendChild(tabContent);
-  switchTab('season-review', tabBtn);
   renderSeasonReview();
 }
+
+// ── Season Review ─────────────────────────────────────────────────────────────
+
+// calculateSeasonReview replaced by toggleSeasonEnded + showSeasonReviewTab
 
 async function renderSeasonReview() {
   const section = document.querySelector('#tab-season-review .main');
@@ -495,18 +526,18 @@ const BASE_WEEKLY_PRIZE = {
   'Teflon': 48.33, 'Alex': 16.67, 'Gaz ⭐': 30, 'Liam': 3.33, 'Craig': 15, 'Marcus': 38.33
 };
 
+const ABBREV_MAP = {
+  'Arsenal':'ARS','Bournemouth':'BOU','Brentford':'BRE','Brighton':'BHA',
+  'Burnley':'BUR','Chelsea':'CHE','Crystal Palace':'CRY','Everton':'EVE',
+  'Fulham':'FUL','Leeds':'LEE','Liverpool':'LIV','Man City':'MCI',
+  'Man Utd':'MNU','Newcastle':'NEW',"Nott'm Forest":'NFO','Spurs':'TOT',
+  'Sunderland':'SUN','Aston Villa':'AVL','West Ham':'WHU','Wolves':'WOL',
+  'Ipswich':'IPS','Leicester':'LEI','Southampton':'SOU'
+};
+
 let currentUser = null;
 const crestCache = {}; // team name -> crest URL, built from API data
 
-async function warmCrestCache() {
-  if (Object.keys(crestCache).length > 10) return; // already warm
-  const data = await plFetch('https://api.football-data.org/v4/competitions/PL/teams');
-  if (!data?.teams) return;
-  data.teams.forEach(t => {
-    const name = cleanTeamName(t.name);
-    if (name && t.crest) crestCache[name] = t.crest;
-  });
-}
 let currentPlayerName = '';
 let currentGW = null;
 let viewingGW = null; // which GW the user is currently browsing
@@ -520,7 +551,6 @@ let simulationActive = false;
 // ── Auth ──────────────────────────────────────────────────────────────────────
 function showError(msg) { const e=document.getElementById('auth-error'); e.textContent=msg; e.style.display='block'; document.getElementById('auth-success').style.display='none'; }
 function showSuccessMsg(msg) { const e=document.getElementById('auth-success'); e.textContent=msg; e.style.display='block'; document.getElementById('auth-error').style.display='none'; }
-function showSignup() {}
 function showSignin() { ['reset-form'].forEach(id=>document.getElementById(id).style.display='none'); document.getElementById('signin-form').style.display='block'; document.getElementById('auth-error').style.display='none'; document.getElementById('auth-success').style.display='none'; }
 function showReset() { document.getElementById('signin-form').style.display='none'; document.getElementById('reset-form').style.display='block'; document.getElementById('auth-error').style.display='none'; document.getElementById('auth-success').style.display='none'; }
 
@@ -555,120 +585,9 @@ async function loadGuest() {
   currentPlayerName = '';
   currentUser = null;
   viewingGW = null;
-  await fetchAndRenderFixturesGuest();
-  await renderLeaderboardGuest();
-}
-
-async function fetchAndRenderFixturesGuest() {
-  const section = document.getElementById('fixtures-section');
-  const allMatches = await fetchFixtures();
-  let weekend = allMatches ? filterWeekendMatches(allMatches) : [];
-
-  if (!weekend.length) {
-    currentGW = await estimateGWNumber([]);
-    const live = await fetchLiveMatches();
-    if (live && live.length) {
-      weekend = live.filter(m => ['Saturday','Sunday'].includes(ukWeekday(m.utcDate)));
-      if (!weekend.length) weekend = live;
-    }
-  }
-
-  if (!weekend.length) {
-    section.innerHTML = '<div class="state-box fade-in"><div class="no-gw-msg">No fixtures this weekend</div></div>';
-    return;
-  }
-
-  if (!currentMatches.length) {
-    currentMatches = weekend;
-    currentGW = await estimateGWNumber(weekend);
-  }
-  if (!viewingGW) viewingGW = currentGW;
-
-  const deadline = currentMatches.map(m=>new Date(m.utcDate)).sort((a,b)=>a-b)[0];
-  const now = new Date();
-  if (!simulationActive) deadlinePassed = now >= deadline;
-
-  let liveMatches = [];
-  if (deadlinePassed && !simulationActive) {
-    liveMatches = await fetchLiveMatches();
-    buildLiveResults(liveMatches);
-    allPredictions = await loadAllPredictions(currentGW);
-  }
-
-  // Render fixture cards — read-only for guests
-  section.innerHTML = '';
-  section.classList.add('fade-in');
-
-  const pillClass = deadlinePassed ? (liveMatches.some(m=>m.status==='IN_PLAY'||m.status==='PAUSED') ? 'live' : '') : 'ok';
-  const pillText = deadlinePassed ? (liveMatches.some(m=>m.status==='IN_PLAY') ? '● Live now' : '✗ Closed') : '✓ Open';
-
-  section.innerHTML = `
-    <div class="gw-nav">${gwNavButtons(currentGW)}</div>
-    <div class="gw-header">
-      <div>
-        <div class="gw-title">Gameweek ${currentGW}</div>
-        <div class="gw-date">${getGWDateLabel(weekend)}</div>
-      </div>
-      <div style="display:flex;flex-direction:column;align-items:flex-end;gap:0.35rem;min-width:0">
-        ${!deadlinePassed ? '<div id="countdown-timer" class="deadline-pill ok">⏱ calculating…</div>' : '<span class="deadline-pill ' + pillClass + '">' + pillText + '</span>'}
-      </div>
-    </div>
-    <div class="guest-banner" style="background:rgba(106,125,106,0.08);border:1px solid var(--border);border-left:3px solid var(--muted);border-radius:6px;padding:0.7rem 1rem;font-size:0.78rem;color:var(--muted);margin-bottom:1rem">
-      Viewing as guest — <a style="color:var(--green);cursor:pointer" onclick="guestSignIn()">sign in to submit predictions</a>
-    </div>
-    <div class="fixture-list" id="fixture-list"></div>`;
-
-  if (!deadlinePassed) startCountdown(deadline);
-
-  const list = document.getElementById('fixture-list');
-  let lastDay = null;
-  currentMatches.forEach(m => {
-    const matchDay = new Date(m.utcDate).toLocaleDateString('en-GB',{timeZone:'Europe/London',weekday:'long',day:'numeric',month:'long'});
-    const dayKey = new Date(m.utcDate).toLocaleDateString('en-GB',{timeZone:'Europe/London'});
-    if (dayKey !== lastDay) {
-      lastDay = dayKey;
-      const dh = document.createElement('div');
-      dh.className = 'day-header';
-      dh.textContent = matchDay;
-      list.appendChild(dh);
-    }
-    const home = cleanTeamName(m.homeTeam?.name) || 'Home';
-    const away = cleanTeamName(m.awayTeam?.name) || 'Away';
-    const key = `${home}_${away}`;
-    const res = liveResults[key];
-    const hCrest = m.homeTeam?.crest ? '<img class="team-crest" src="' + m.homeTeam.crest + '" alt="">' : '';
-    const aCrest = m.awayTeam?.crest ? '<img class="team-crest" src="' + m.awayTeam.crest + '" alt="">' : '';
-
-    let cardClass = 'fixture-card';
-    if (res?.status==='IN_PLAY'||res?.status==='PAUSED') cardClass += ' live-now';
-
-    const scoreRow = deadlinePassed
-      ? '<div class="live-score"><span class="live-score-num">'+(res?.home??'–')+'</span><span class="live-score-sep">:</span><span class="live-score-num">'+(res?.away??'–')+'</span></div>'
-      : '<div class="live-score"><span class="live-score-num" style="color:var(--muted);font-size:1rem">vs</span></div>';
-
-    let subParts = [];
-    if (deadlinePassed && res) {
-      if (res.status==='IN_PLAY') subParts.push('<span class="live-badge"><span class="live-dot"></span>LIVE</span>');
-      else if (res.status==='PAUSED') subParts.push('<span class="live-badge">HT</span>');
-    }
-    subParts.push('<span>'+formatMatchTime(m.utcDate)+'</span>');
-
-    const card = document.createElement('div');
-    card.className = cardClass;
-    card.innerHTML = '<div class="fixture-main"><div class="fixture-team home">'+home+'</div><div class="fixture-crest">'+hCrest+'</div>'+scoreRow+'<div class="fixture-crest">'+aCrest+'</div><div class="fixture-team away">'+away+'</div></div><div class="fixture-sub">'+subParts.join(' · ')+'</div>';
-    list.appendChild(card);
-  });
-
-  // Show predictions table after deadline
-  if (deadlinePassed && Object.keys(allPredictions).length) {
-    const summarySection = document.getElementById('summary-section');
-    deadlinePassed = true; // ensure renderSummary shows table
-    renderSummary({});
-  }
-}
-
-async function renderLeaderboardGuest() {
+  await fetchAndRenderFixtures();
   await renderLeaderboard();
+  checkSeasonEnded();
 }
 
 async function signIn() {
@@ -708,9 +627,9 @@ async function loadApp(user) {
   // Show admin tab only for Jake
   const adminBtn = document.getElementById('admin-tab-btn');
   if (adminBtn) adminBtn.style.display = currentPlayerName === 'Jake' ? '' : 'none';
-  warmCrestCache();
   fetchAndRenderFixtures();
   renderLeaderboard();
+  checkSeasonEnded();
 }
 
 // ── Tabs ──────────────────────────────────────────────────────────────────────
@@ -720,7 +639,7 @@ function switchTab(tab,btn) {
   document.getElementById('tab-'+tab).classList.add('active');
   btn.classList.add('active');
   if(tab==='leaderboard') renderLeaderboard();
-  if(tab==='scores' && !currentUser) fetchAndRenderFixturesGuest();
+  if(tab==='scores' && !currentUser) fetchAndRenderFixtures();
   if(tab==='admin') {
     // Reset pin screen each time tab is opened
     document.getElementById('admin-pin-screen').style.display = '';
@@ -998,7 +917,7 @@ function cleanTeamName(name) {
 
 const SUPABASE_PROXY = 'https://iufbdwsmbwrtcqzkvyey.supabase.co/functions/v1/football-proxy';
 const plCache = {}; // simple in-memory cache
-const CACHE_TTL = 25000; // 25 seconds — ensures fresh data within one 30s refresh cycle
+const CACHE_TTL = 35000; // 35s — safely within 30s refresh cycle with margin
 
 async function plFetch(url) {
   if (simulationActive) return null;
@@ -1690,7 +1609,7 @@ async function renderGWView(gw) {
       <table class="pred-table">
         <thead><tr>
           <th>Player</th>
-          ${allKeys.map(key => { const p=key.split('_'); const h=p[0]; const a=p.slice(1).join('_'); const abbrevMap={'Arsenal':'ARS','Bournemouth':'BOU','Brentford':'BRE','Brighton':'BHA','Burnley':'BUR','Chelsea':'CHE','Crystal Palace':'CRY','Everton':'EVE','Fulham':'FUL','Leeds':'LEE','Liverpool':'LIV','Man City':'MCI','Man Utd':'MNU','Newcastle':'NEW',"Nott'm Forest":'NFO','Spurs':'TOT','Sunderland':'SUN','Aston Villa':'AVL','West Ham':'WHU','Wolves':'WOL','Ipswich':'IPS','Leicester':'LEI','Southampton':'SOU'}; const ab=n=>abbrevMap[n]||n.slice(0,3).toUpperCase(); return `<th>${ab(h)} v ${ab(a)}</th>`; }).join('')}
+          ${allKeys.map(key => { const p=key.split('_'); const h=p[0]; const a=p.slice(1).join('_'); const ab=n=>ABBREV_MAP[n]||n.slice(0,3).toUpperCase(); return `<th>${ab(h)} v ${ab(a)}</th>`; }).join('')}
           <th>GW pts</th>
         </tr></thead>
         <tbody>
@@ -2037,17 +1956,7 @@ function renderSummary(myPreds) {
   const section = document.getElementById('summary-section');
   if (!currentMatches.length) { section.style.display = 'none'; return; }
 
-  const abbrev = name => {
-    const map = {
-      'Arsenal':'ARS','Bournemouth':'BOU','Brentford':'BRE','Brighton':'BHA',
-      'Burnley':'BUR','Chelsea':'CHE','Crystal Palace':'CRY','Everton':'EVE',
-      'Fulham':'FUL','Leeds':'LEE','Liverpool':'LIV','Man City':'MCI',
-      'Man Utd':'MNU','Newcastle':'NEW',"Nott'm Forest":'NFO','Spurs':'TOT',
-      'Sunderland':'SUN','Aston Villa':'AVL','West Ham':'WHU','Wolves':'WOL',
-      'Ipswich':'IPS','Leicester':'LEI','Southampton':'SOU'
-    };
-    return map[name] || name.slice(0,3).toUpperCase();
-  };
+  const abbrev = name => ABBREV_MAP[name] || name.slice(0,3).toUpperCase();
   const allKeys = currentMatches.map((m, i) => {
     const home = cleanTeamName(m.homeTeam?.name) || 'Home';
     const away = cleanTeamName(m.awayTeam?.name) || 'Away';
@@ -2228,7 +2137,7 @@ async function renderAdmin() {
     <div style="display:flex;gap:0.75rem;flex-wrap:wrap;margin-bottom:1.5rem">
       <button class="btn-save" onclick="adminSync()" style="padding:0.5rem 1.2rem;font-size:0.8rem">↻ Sync live results now</button>
       <button class="btn-save" onclick="renderAdmin()" style="padding:0.5rem 1.2rem;font-size:0.8rem;background:var(--bg3);color:var(--text)">↻ Refresh admin</button>
-      <button class="btn-save" onclick="calculateSeasonReview()" style="padding:0.5rem 1.2rem;font-size:0.8rem;background:rgba(255,213,79,0.15);color:var(--gold);border:1px solid rgba(255,213,79,0.3)">🏅 Calculate Season Winnings</button>
+      <button class="btn-save" id="season-toggle-btn" onclick="toggleSeasonEnded()" style="padding:0.5rem 1.2rem;font-size:0.8rem;background:rgba(255,213,79,0.15);color:var(--gold);border:1px solid rgba(255,213,79,0.3)">🏅 Enable Season Review tab</button>
     </div>
     <div id="admin-sync-msg" style="font-size:0.75rem;color:var(--green);margin-bottom:1rem;display:none">✓ Sync triggered</div>
 
