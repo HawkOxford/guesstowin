@@ -1130,6 +1130,20 @@ async function fetchAndRenderFixtures(targetGW) {
       buildLiveResults(liveMatches);
     }
 
+    // If all matches are finished, show GW review instead of live view
+    const allFinished = deadlinePassed && currentMatches.length > 0 &&
+      currentMatches.every(m => {
+        const home = cleanTeamName(m.homeTeam?.name)||'Home';
+        const away = cleanTeamName(m.awayTeam?.name)||'Away';
+        const res = liveResults[home+'_'+away];
+        return res && res.status === 'FINISHED';
+      });
+
+    if (allFinished) {
+      await renderGWView(currentGW);
+      return;
+    }
+
     renderMatchesView(myPreds, deadline, liveMatches, currentMatches);
     if (!deadlinePassed) startCountdown(deadline);
     else if (countdownTimer) { clearInterval(countdownTimer); countdownTimer = null; }
