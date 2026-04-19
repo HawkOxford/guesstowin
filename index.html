@@ -7,7 +7,121 @@
 <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=DM+Sans:wght@300;400;500;700&display=swap" rel="stylesheet">
 <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><rect width='100' height='100' rx='20' fill='%230a0f0a'/><text y='72' x='50' text-anchor='middle' font-size='60' font-family='Arial Black,sans-serif' fill='%2300e676'>G</text></svg>">
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2">
-<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js">
+// ── Position Tracker Tab ──────────────────────────────────────────────────────
+async function renderTracker() {
+  const section = document.getElementById('tracker-section');
+  section.innerHTML = '<div class="state-box"><div class="spinner"></div><div>Loading…</div></div>';
+
+  // Load Supabase data for GW27+
+  const [{data: results},{data: allPreds},{data: allProfiles}] = await Promise.all([
+    sb.from('results').select('gameweek,match_key,home_score,away_score,status').eq('status','finished').limit(5000),
+    sb.from('predictions').select('user_id,gameweek,match_key,home_score,away_score').limit(10000),
+    sb.from('profiles').select('id,player_name')
+  ]);
+
+  const profileMap = {};
+  (allProfiles||[]).forEach(p => { profileMap[p.id] = p.player_name; });
+
+  // Build gwPoints: start with hardcoded GW1-26
+  const gwPoints = {};
+  PLAYERS.forEach(name => {
+    const hist = HISTORICAL_GW_POINTS[name] || {};
+    Object.entries(hist).forEach(([gw, pts]) => {
+      if (!gwPoints[name]) gwPoints[name] = {};
+      gwPoints[name][parseInt(gw)] = pts;
+    });
+  });
+
+  // Add GW27+ from Supabase
+  if (results && allPreds) {
+    const resultMap = {};
+    results.forEach(r => { resultMap[r.gameweek+'_'+r.match_key] = r; });
+    allPreds.forEach(p => {
+      const name = profileMap[p.user_id];
+      if (!name || p.gameweek < 27) return;
+      const r = resultMap[p.gameweek+'_'+p.match_key];
+      if (!r) return;
+      const pts = calcPoints(p.home_score??0, p.away_score??0, r.home_score, r.away_score);
+      if (pts===null) return;
+      if (!gwPoints[name]) gwPoints[name] = {};
+      gwPoints[name][p.gameweek] = (gwPoints[name][p.gameweek]||0) + pts;
+    });
+  }
+
+  const gws = [...new Set(Object.values(gwPoints).flatMap(p=>Object.keys(p)))].map(Number).sort((a,b)=>a-b);
+  if (!gws.length) {
+    section.innerHTML = '<div class="state-box">No data yet.</div>';
+    return;
+  }
+
+  const colors = ['#00e676','#ffd54f','#ffa726','#ef5350','#64b5f6','#ce93d8','#80cbc4','#ffcc80','#b0bec5','#a1734e'];
+
+  // Build cumulative position data
+  const datasets = PLAYERS.map((name, i) => ({
+    label: name,
+    data: gws.map(gw => {
+      const scores = PLAYERS.map(n => ({
+        name: n,
+        total: gws.filter(g=>g<=gw).reduce((s,g)=>s+(gwPoints[n]?.[g]||0), 0)
+      })).sort((a,b)=>b.total-a.total);
+      return scores.findIndex(s=>s.name===name) + 1;
+    }),
+    borderColor: colors[i % colors.length],
+    backgroundColor: 'transparent',
+    borderWidth: name === currentPlayerName ? 3 : 1.5,
+    pointRadius: gws.length > 20 ? 2 : 3,
+    tension: 0.3
+  }));
+
+  section.innerHTML =
+    '<div class="section-label">Season Position Tracker</div>'+
+    '<div style="background:var(--card);border:1px solid var(--border);border-radius:10px;padding:1rem;overflow-x:auto">'+
+      '<div style="min-width:'+Math.max(320, gws.length * 28)+'px">'+
+        '<canvas id="position-chart"></canvas>'+
+      '</div>'+
+    '</div>'+
+    '<div style="margin-top:0.75rem;font-size:0.72rem;color:var(--muted);text-align:center">Scroll horizontally to see all gameweeks</div>';
+
+  setTimeout(() => {
+    const ctx = document.getElementById('position-chart');
+    if (!ctx || !window.Chart) return;
+    const existing = Chart.getChart(ctx);
+    if (existing) existing.destroy();
+    new Chart(ctx, {
+      type: 'line',
+      data: { labels: gws.map(g=>'GW'+g), datasets },
+      options: {
+        responsive: true,
+        maintainAspectRatio: true,
+        scales: {
+          y: {
+            reverse: true, min: 1, max: PLAYERS.length,
+            ticks: { stepSize:1, color:'#6a7d6a', callback: v=>'#'+v },
+            grid: { color:'#1f2e1f' }
+          },
+          x: {
+            ticks: { color:'#6a7d6a', maxRotation: 45, font: { size: 10 } },
+            grid: { color:'#1f2e1f' }
+          }
+        },
+        plugins: {
+          legend: {
+            position: 'top',
+            labels: {
+              color: '#e8f5e9',
+              font: { size: 10 },
+              boxWidth: 10,
+              padding: 8
+            }
+          }
+        }
+      }
+    });
+  }, 150);
+}
+
+</script>
 <style>
   :root {
     --green: #00e676;
@@ -265,6 +379,7 @@
     <div class="tabs">
       <button class="tab-btn active" onclick="switchTab('scores',this)">⚽ Scores</button>
       <button class="tab-btn" onclick="switchTab('leaderboard',this)">🏆 Leaderboard</button>
+      <button class="tab-btn" onclick="switchTab('tracker',this)">📈 Position Tracker</button>
       <button class="tab-btn" id="admin-tab-btn" onclick="switchTab('admin',this)" style="display:none">⚙ Admin</button>
     </div>
   </header>
@@ -294,6 +409,13 @@
         <strong>Rules:</strong> Submit before the first game kicks off. No changes after kick-off.
         Correct result = <strong>1pt</strong> · Correct score = <strong>3pts</strong> · Cost: <strong>£2/week</strong>
       </div>
+    </div>
+  </div>
+
+  <!-- Tracker Tab -->
+  <div id="tab-tracker" class="tab-content">
+    <div class="main">
+      <div id="tracker-section"><div class="state-box"><div class="spinner"></div><div>Loading tracker…</div></div></div>
     </div>
   </div>
 
@@ -450,6 +572,7 @@ function switchTab(tab,btn) {
   document.getElementById('tab-'+tab).classList.add('active');
   btn.classList.add('active');
   if(tab==='leaderboard') renderLeaderboard();
+  if(tab==='tracker') renderTracker();
   if(tab==='scores' && !currentUser) fetchAndRenderFixtures();
   if(tab==='admin') {
     // Reset pin screen each time tab is opened
@@ -616,12 +739,19 @@ async function renderLeaderboard() {
 
   const rankClass = r => r===1?'top-1':r===2?'top-2':r===3?'top-3':'';
 
-  // GW leader
+  // GW leader — find the most recent completed GW winner
   let gwLeaders = [];
-  if(currentGW) {
-    const gwScores = PLAYERS.map(n => ({name:n, pts: gwPoints[n]?.[currentGW]||0}));
+  let gwLeaderGW = null;
+  // Use the most recent GW that has results (not necessarily currentGW which may be live)
+  const completedGWsForLeader = [...new Set((results||[]).map(r=>r.gameweek))].sort((a,b)=>b-a);
+  const latestCompletedGW = completedGWsForLeader[0] || null;
+  if(latestCompletedGW) {
+    const gwScores = PLAYERS.map(n => ({name:n, pts: gwPoints[n]?.[latestCompletedGW]||0}));
     const maxGW = Math.max(...gwScores.map(s=>s.pts));
-    if(maxGW > 0) gwLeaders = gwScores.filter(s=>s.pts===maxGW).map(s=>s.name);
+    if(maxGW > 0) {
+      gwLeaders = gwScores.filter(s=>s.pts===maxGW).map(s=>s.name);
+      gwLeaderGW = latestCompletedGW;
+    }
   }
 
   const gwPointsHasData = Object.keys(gwPoints).length > 0;
@@ -646,7 +776,7 @@ async function renderLeaderboard() {
           <div class="lb-rank" style="display:flex;align-items:center;gap:2px">
             <span>${p.rank}</span>${arrowStr}
           </div>
-          <div class="lb-name">${isGWLeader?'🏆 ':''}${p.name}
+          <div class="lb-name">${isGWLeader?'👑 ':''}${p.name}
             ${tied?'<span class="tied-badge">TIE</span>':''}
             ${isMe?'<span class="you-badge">YOU</span>':''}
           </div>
@@ -658,43 +788,9 @@ async function renderLeaderboard() {
         </div>`;
       }).join('')}
     </div>
-    ${gwPointsHasData ? '<div class="section-label" style="margin-top:2rem">Season position tracker</div><div style="background:var(--card);border:1px solid var(--border);border-radius:10px;padding:1.2rem"><canvas id="position-chart"></canvas></div>' : ''}
+    ${gwLeaderGW ? '<div style="font-size:0.72rem;color:var(--muted);margin-top:0.6rem;padding:0 0.25rem">👑 GW'+gwLeaderGW+' winner: '+gwLeaders.join(' & ')+'</div>' : ''}
   `;
 
-  if (gwPointsHasData) {
-    const gws = [...new Set(Object.values(gwPoints).flatMap(p=>Object.keys(p)))].map(Number).sort((a,b)=>a-b);
-    const colors = ['#00e676','#ffd54f','#ffa726','#ef5350','#64b5f6','#ce93d8','#80cbc4','#ffcc80','#b0bec5','#a1734e'];
-    const datasets = PLAYERS.map((name,i) => ({
-      label: name,
-      data: gws.map(gw => {
-        const scores = PLAYERS.map(n => ({name:n,total:gws.filter(g=>g<=gw).reduce((s,g)=>s+(gwPoints[n]?.[g]||0),0)})).sort((a,b)=>b.total-a.total);
-        return scores.findIndex(s=>s.name===name)+1;
-      }),
-      borderColor: colors[i%colors.length],
-      backgroundColor: 'transparent',
-      borderWidth: name===currentPlayerName?3:1.5,
-      pointRadius: 3,
-      tension: 0.3
-    }));
-    setTimeout(()=>{
-      const ctx = document.getElementById('position-chart');
-      if(!ctx||!window.Chart) return;
-      const existing = Chart.getChart(ctx);
-      if(existing) existing.destroy();
-      new Chart(ctx, {
-        type: 'line',
-        data: {labels: gws.map(g=>'GW'+g), datasets},
-        options: {
-          responsive: true,
-          scales: {
-            y: {reverse:true,min:1,max:PLAYERS.length,ticks:{stepSize:1,color:'#6a7d6a',callback:v=>'#'+v},grid:{color:'#1f2e1f'}},
-            x: {ticks:{color:'#6a7d6a',maxRotation:45},grid:{color:'#1f2e1f'}}
-          },
-          plugins: {legend:{labels:{color:'#e8f5e9',font:{size:11},boxWidth:12}}}
-        }
-      });
-    },150);
-  }
 }
 
 // ── API ───────────────────────────────────────────────────────────────────────
@@ -1204,8 +1300,18 @@ function gwNavButtons(gw) {
     const dates = currentMatches.map(m => ukDateStr(m.utcDate)).sort();
     const lastDate = dates[dates.length - 1];
     const [y, mo, d] = lastDate.split('-').map(Number);
-    const sundayMidnight = new Date(y, mo - 1, d, 23, 59, 0);
-    return now >= sundayMidnight;
+    // Use UK midnight - construct as UTC equivalent of 23:59 UK time
+    // In BST (summer) UK is UTC+1, in GMT (winter) UTC+0
+    // Safest: check if it's past 23:59 on the last date in UK timezone
+    const ukMidnightCheck = new Date().toLocaleDateString('en-GB', {timeZone:'Europe/London'}) !== lastDate.split('-').reverse().join('/');
+    const afterMidnight = ukMidnightCheck || (() => {
+      const ukNow = new Date().toLocaleString('en-GB', {timeZone:'Europe/London'});
+      const [datePart, timePart] = ukNow.split(', ');
+      const [dd, mm, yyyy] = datePart.split('/');
+      const curDateStr = yyyy+'-'+mm.padStart(2,'0')+'-'+dd.padStart(2,'0');
+      return curDateStr > lastDate;
+    })();
+    return afterMidnight;
   })();
 
   return `
@@ -1459,14 +1565,31 @@ async function renderGWView(gw) {
 
 function getNextWeekendAfterCurrent(allMatches) {
   // Get the weekend AFTER the currentMatches weekend
+  // Use date strings to exclude the ENTIRE current weekend (Sat+Sun), not just loaded fixtures
   const currentDates = new Set(currentMatches.map(m => ukDateStr(m.utcDate)));
+  // Also derive the full current weekend date range (Sat+Sun) to block even unloaded fixtures
+  let currentWeekendDates = new Set(currentDates);
+  if (currentDates.size > 0) {
+    const sorted = [...currentDates].sort();
+    const firstDate = sorted[0];
+    const [y, mo, d] = firstDate.split('-').map(Number);
+    const sat = new Date(y, mo-1, d);
+    const satStr = ukDateStr(sat.toISOString());
+    const sun = new Date(y, mo-1, d+1);
+    const sunStr = ukDateStr(sun.toISOString());
+    currentWeekendDates.add(satStr);
+    currentWeekendDates.add(sunStr);
+  }
   const now = new Date();
   const future = allMatches
     .filter(m => {
-      if (new Date(m.utcDate) <= now) return false;
       const day = ukWeekday(m.utcDate);
       if (day !== 'Saturday' && day !== 'Sunday') return false;
-      return !currentDates.has(ukDateStr(m.utcDate));
+      // Exclude anything on the current weekend's dates
+      if (currentWeekendDates.has(ukDateStr(m.utcDate))) return false;
+      // Must be in the future
+      if (new Date(m.utcDate) <= now) return false;
+      return true;
     })
     .sort((a,b) => new Date(a.utcDate) - new Date(b.utcDate));
 
