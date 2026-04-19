@@ -6,7 +6,172 @@
 <title>Guess to Win 2025/26</title>
 <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=DM+Sans:wght@300;400;500;700&display=swap" rel="stylesheet">
 <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><rect width='100' height='100' rx='20' fill='%230a0f0a'/><text y='72' x='50' text-anchor='middle' font-size='60' font-family='Arial Black,sans-serif' fill='%2300e676'>G</text></svg>">
-<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2">
+// ── Season Review ─────────────────────────────────────────────────────────────
+
+function calculateSeasonReview() {
+  if (!currentGW) { alert('GW not loaded yet — please wait and try again.'); return; }
+  const existingTab = document.getElementById('tab-season-review');
+  const existingBtn = document.getElementById('season-review-tab-btn');
+  if (existingTab) existingTab.remove();
+  if (existingBtn) existingBtn.remove();
+  const tabBtn = document.createElement('button');
+  tabBtn.className = 'tab-btn';
+  tabBtn.id = 'season-review-tab-btn';
+  tabBtn.textContent = '🏅 Season Review';
+  tabBtn.onclick = function() { switchTab('season-review', this); };
+  document.querySelector('.tabs').appendChild(tabBtn);
+  const tabContent = document.createElement('div');
+  tabContent.id = 'tab-season-review';
+  tabContent.className = 'tab-content';
+  tabContent.innerHTML = '<div class="main"><div class="state-box"><div class="spinner"></div><div>Calculating…</div></div></div>';
+  document.getElementById('app-screen').appendChild(tabContent);
+  switchTab('season-review', tabBtn);
+  renderSeasonReview();
+}
+
+async function renderSeasonReview() {
+  const section = document.querySelector('#tab-season-review .main');
+  const totalGWs = currentGW;
+  const seasonPot = totalGWs * 10;
+  const weeklyPotTotal = totalGWs * 10;
+  const paidInPerPlayer = totalGWs * 2;
+
+  const [{ data: results }, { data: allPreds }, { data: allProfiles }] = await Promise.all([
+    sb.from('results').select('gameweek,match_key,home_score,away_score,status').eq('status','finished'),
+    sb.from('predictions').select('user_id,gameweek,match_key,home_score,away_score'),
+    sb.from('profiles').select('id,player_name')
+  ]);
+
+  const profileMap = {};
+  (allProfiles||[]).forEach(p => { profileMap[p.id] = p.player_name; });
+
+  const gwPoints = {};
+  const gwWinners = {};
+  if (results && allPreds) {
+    const resultMap = {};
+    results.forEach(r => { resultMap[r.gameweek+'_'+r.match_key] = r; });
+    allPreds.forEach(p => {
+      const name = profileMap[p.user_id];
+      if (!name) return;
+      const r = resultMap[p.gameweek+'_'+p.match_key];
+      if (!r) return;
+      const pts = calcPoints(p.home_score??0, p.away_score??0, r.home_score, r.away_score);
+      if (pts===null) return;
+      if (!gwPoints[name]) gwPoints[name]={};
+      gwPoints[name][p.gameweek] = (gwPoints[name][p.gameweek]||0) + pts;
+    });
+    const gws = [...new Set(results.map(r=>r.gameweek))];
+    gws.forEach(gw => {
+      const scores = PLAYERS.map(n=>({name:n,pts:gwPoints[n]?.[gw]||0}));
+      const max = Math.max(...scores.map(s=>s.pts));
+      if (max>0) gwWinners[gw] = scores.filter(s=>s.pts===max).map(s=>s.name);
+    });
+  }
+
+  const weeklyWinnings = {};
+  PLAYERS.forEach(name => {
+    let extraPrize = 0;
+    Object.entries(gwWinners).forEach(([gw,winners]) => {
+      if (winners.includes(name)) extraPrize += 10/winners.length;
+    });
+    weeklyWinnings[name] = BASE_WEEKLY_PRIZE[name] + extraPrize;
+  });
+
+  const totals = PLAYERS.map(name => {
+    const pts = Object.values(gwPoints[name]||{}).reduce((a,b)=>a+b,0);
+    return { name, total: BASE_SCORES[name]+pts };
+  }).sort((a,b)=>b.total-a.total);
+
+  // Season pot shares — handle ties spanning prize positions
+  const prizePercents = [0.60, 0.30, 0.10];
+  const seasonShare = {};
+  PLAYERS.forEach(name => { seasonShare[name]=0; });
+  let prizeIdx = 0, i = 0;
+  while (i < totals.length) {
+    let j = i;
+    while (j < totals.length && totals[j].total===totals[i].total) j++;
+    const groupSize = j - i;
+    let totalPct = 0;
+    for (let k=0; k<groupSize && prizeIdx+k<prizePercents.length; k++) totalPct += prizePercents[prizeIdx+k];
+    const shareEach = (totalPct * seasonPot) / groupSize;
+    totals.slice(i,j).forEach(t => { seasonShare[t.name] = shareEach; });
+    prizeIdx += groupSize;
+    i = j;
+  }
+
+  const netPositions = PLAYERS.map(name => {
+    const totalWon = weeklyWinnings[name] + seasonShare[name];
+    return { name, weeklyWon: weeklyWinnings[name], seasonShare: seasonShare[name], totalWon, net: totalWon - paidInPerPlayer };
+  }).sort((a,b)=>b.net-a.net);
+
+  // Minimum transfers settlement
+  const cred = netPositions.filter(p=>p.net>0.005).map(p=>({name:p.name,amount:p.net}));
+  const debt = netPositions.filter(p=>p.net<-0.005).map(p=>({name:p.name,amount:-p.net}));
+  const transfers = [];
+  let ci=0, di=0;
+  while (ci<cred.length && di<debt.length) {
+    const amount = Math.min(cred[ci].amount, debt[di].amount);
+    if (amount>0.005) transfers.push({from:debt[di].name, to:cred[ci].name, amount});
+    cred[ci].amount -= amount;
+    debt[di].amount -= amount;
+    if (cred[ci].amount<0.005) ci++;
+    if (debt[di].amount<0.005) di++;
+  }
+
+  const rankColor = r => r===1?'var(--gold)':r===2?'var(--silver)':r===3?'var(--bronze)':'var(--text)';
+
+  section.innerHTML =
+    '<div class="section-label">Season Summary · GW1–GW'+totalGWs+'</div>'+
+    '<div style="display:flex;gap:1.5rem;flex-wrap:wrap;margin-bottom:1.5rem">'+
+      '<div class="pts-stat"><div class="pts-stat-num">£'+seasonPot+'</div><div class="pts-stat-label">Season pot</div></div>'+
+      '<div class="pts-stat"><div class="pts-stat-num">£'+weeklyPotTotal+'</div><div class="pts-stat-label">Weekly pots total</div></div>'+
+      '<div class="pts-stat"><div class="pts-stat-num">£'+(seasonPot+weeklyPotTotal)+'</div><div class="pts-stat-label">Total pot</div></div>'+
+      '<div class="pts-stat"><div class="pts-stat-num">£'+paidInPerPlayer+'</div><div class="pts-stat-label">Paid in per player</div></div>'+
+    '</div>'+
+    '<div class="section-label">Final Standings &amp; Winnings</div>'+
+    '<div style="overflow-x:auto;margin-bottom:1.5rem"><div class="leaderboard-card" style="max-width:700px;min-width:500px">'+
+      '<div style="display:grid;grid-template-columns:36px 1fr 80px 80px 90px 90px;gap:0.5rem;padding:0.5rem 1rem;border-bottom:1px solid var(--border);font-size:0.62rem;font-weight:700;letter-spacing:0.1em;text-transform:uppercase;color:var(--muted)">'+
+        '<div></div><div>Player</div><div style="text-align:right">Pts</div><div style="text-align:right">Weekly</div><div style="text-align:right">Season</div><div style="text-align:right">Total won</div>'+
+      '</div>'+
+      netPositions.map(p => {
+        const rank = totals.findIndex(t=>t.name===p.name)+1;
+        const standing = totals.find(t=>t.name===p.name);
+        return '<div style="display:grid;grid-template-columns:36px 1fr 80px 80px 90px 90px;gap:0.5rem;padding:0.75rem 1rem;border-bottom:1px solid var(--border);align-items:center">'+
+          '<div style="font-family:Bebas Neue,sans-serif;font-size:1.1rem;color:'+rankColor(rank)+'">'+rank+'</div>'+
+          '<div style="font-weight:500">'+p.name+'</div>'+
+          '<div style="text-align:right;font-family:Bebas Neue,sans-serif;font-size:1.1rem;color:var(--green)">'+(standing?.total||0)+'</div>'+
+          '<div style="text-align:right;font-size:0.85rem">£'+p.weeklyWon.toFixed(2)+'</div>'+
+          '<div style="text-align:right;font-size:0.85rem;color:var(--gold)">£'+p.seasonShare.toFixed(2)+'</div>'+
+          '<div style="text-align:right;font-weight:700;color:var(--green)">£'+p.totalWon.toFixed(2)+'</div>'+
+        '</div>';
+      }).join('')+
+    '</div></div>'+
+    '<div class="section-label">Net Positions</div>'+
+    '<div class="leaderboard-card" style="max-width:500px;margin-bottom:1.5rem">'+
+      netPositions.map(p => {
+        const isPos = p.net >= -0.005;
+        return '<div style="display:flex;justify-content:space-between;align-items:center;padding:0.65rem 1rem;border-bottom:1px solid var(--border)">'+
+          '<span style="font-weight:500">'+p.name+'</span>'+
+          '<span style="font-weight:700;color:'+(isPos?'var(--green)':'var(--red)')+'">'+
+            (isPos?'+':'')+'£'+Math.abs(p.net).toFixed(2)+
+            '<span style="font-size:0.65rem;font-weight:400;color:var(--muted);margin-left:4px">'+(isPos?'to receive':'to pay')+'</span>'+
+          '</span>'+
+        '</div>';
+      }).join('')+
+    '</div>'+
+    '<div class="section-label">Settlement — Minimum Transfers</div>'+
+    '<div class="leaderboard-card" style="max-width:500px;margin-bottom:2rem">'+
+      (transfers.length ? transfers.map(t=>
+        '<div style="display:flex;justify-content:space-between;align-items:center;padding:0.65rem 1rem;border-bottom:1px solid var(--border)">'+
+          '<span style="font-size:0.9rem"><strong>'+t.from+'</strong> <span style="color:var(--muted)">→</span> <strong>'+t.to+'</strong></span>'+
+          '<span style="font-family:Bebas Neue,sans-serif;font-size:1.3rem;color:var(--green)">£'+t.amount.toFixed(2)+'</span>'+
+        '</div>'
+      ).join('') : '<div style="padding:1rem;color:var(--muted);font-size:0.85rem">No transfers needed.</div>')+
+    '</div>';
+}
+
+</script>
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
 <style>
   :root {
@@ -2063,6 +2228,7 @@ async function renderAdmin() {
     <div style="display:flex;gap:0.75rem;flex-wrap:wrap;margin-bottom:1.5rem">
       <button class="btn-save" onclick="adminSync()" style="padding:0.5rem 1.2rem;font-size:0.8rem">↻ Sync live results now</button>
       <button class="btn-save" onclick="renderAdmin()" style="padding:0.5rem 1.2rem;font-size:0.8rem;background:var(--bg3);color:var(--text)">↻ Refresh admin</button>
+      <button class="btn-save" onclick="calculateSeasonReview()" style="padding:0.5rem 1.2rem;font-size:0.8rem;background:rgba(255,213,79,0.15);color:var(--gold);border:1px solid rgba(255,213,79,0.3)">🏅 Calculate Season Winnings</button>
     </div>
     <div id="admin-sync-msg" style="font-size:0.75rem;color:var(--green);margin-bottom:1rem;display:none">✓ Sync triggered</div>
 
