@@ -1230,7 +1230,8 @@ function gwNavButtons(gw) {
   const nextGW = gw + 1;
   // Disable next button if it would go beyond the current GW
   // Users can only navigate to GWs that have started (up to currentGW)
-  const nextDisabled = nextGW > currentGW;
+  const nextDisabled = !currentGW || nextGW > currentGW;
+  console.log(`gwNavButtons: gw=${gw}, currentGW=${currentGW}, nextGW=${nextGW}, nextDisabled=${nextDisabled}`);
   return `
     <button class="gw-nav-btn" ${prevGW < 1 ? 'disabled' : ''} onclick="navigateGW(${prevGW})">← GW${prevGW}</button>
     <button class="gw-nav-btn" ${nextDisabled ? 'disabled' : ''} onclick="navigateGW(${nextGW})">GW${nextGW} →</button>
