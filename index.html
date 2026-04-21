@@ -891,20 +891,16 @@ async function estimateGWNumber(matches) {
     const validRows = (resultRows || []).filter(r => r.gameweek >= 1 && r.gameweek <= 38);
     if (!validRows.length) return 1;
 
-    // Count unique results per GW (both finished and all)
+    // Count unique finished results per GW
     const finishedCounts = {};
-    const totalCounts = {};
     validRows.forEach(r => {
-      if (!totalCounts[r.gameweek]) totalCounts[r.gameweek] = new Set();
-      totalCounts[r.gameweek].add(r.match_key);
-
       if (r.status === 'finished') {
         if (!finishedCounts[r.gameweek]) finishedCounts[r.gameweek] = new Set();
         finishedCounts[r.gameweek].add(r.match_key);
       }
     });
 
-    // Determine expected fixture count per GW from predictions table as fallback
+    // Get expected fixture count per GW from predictions table (most reliable source)
     const { data: predRows } = await sb.from('predictions').select('gameweek,match_key').limit(10000);
     const fixtureCounts = {};
     (predRows || []).forEach(p => {
@@ -913,13 +909,13 @@ async function estimateGWNumber(matches) {
       fixtureCounts[p.gameweek].add(key);
     });
 
-    // A GW is complete when all its fixtures (from results table) are finished
-    const gwsWithResults = Object.keys(totalCounts).map(Number).sort((a,b) => a-b);
-    const completedGWs = gwsWithResults.filter(gw => {
+    // A GW is complete when all its expected fixtures are finished
+    const allGWs = [...new Set([...Object.keys(finishedCounts), ...Object.keys(fixtureCounts)])].map(Number).sort((a,b) => a-b);
+    const completedGWs = allGWs.filter(gw => {
       const finishedCount = finishedCounts[gw] ? finishedCounts[gw].size : 0;
-      // Use actual fixture count from results table (totalCounts), fallback to predictions
-      const expectedCount = totalCounts[gw] ? totalCounts[gw].size : (fixtureCounts[gw] ? fixtureCounts[gw].size : 10);
-      return finishedCount >= expectedCount;
+      const expectedCount = fixtureCounts[gw] ? fixtureCounts[gw].size : 10;
+      // Only complete if we have finished all expected fixtures
+      return finishedCount >= expectedCount && finishedCount > 0;
     });
 
     if (!completedGWs.length) return 1;
