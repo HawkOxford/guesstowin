@@ -915,29 +915,36 @@ async function estimateGWNumber(matches) {
       const finishedCount = finishedCounts[gw] ? finishedCounts[gw].size : 0;
       const expectedCount = fixtureCounts[gw] ? fixtureCounts[gw].size : 10;
       // Only complete if we have finished all expected fixtures
-      return finishedCount >= expectedCount && finishedCount > 0;
+      const isComplete = finishedCount >= expectedCount && finishedCount > 0;
+      console.log(`GW${gw}: finished=${finishedCount}, expected=${expectedCount}, complete=${isComplete}`);
+      return isComplete;
     });
 
     if (!completedGWs.length) return 1;
     const maxCompleted = Math.max(...completedGWs);
+    console.log(`Max completed GW: ${maxCompleted}, completedGWs:`, completedGWs);
 
     // Get UK time including hours and minutes
     const ukTime = new Date().toLocaleString('en-GB', {timeZone:'Europe/London', hour12:false});
     const ukDay = new Date().toLocaleDateString('en-GB', {timeZone:'Europe/London', weekday:'long'});
     const [datePart, timePart] = ukTime.split(', ');
     const [hours, minutes] = timePart.split(':').map(Number);
+    console.log(`UK Time: ${ukDay} ${timePart} (hours=${hours}, minutes=${minutes})`);
 
     // Stay on current (completed) GW if:
     // - It's Saturday or Sunday
     // - It's Monday but before 00:01
     if (ukDay === 'Saturday' || ukDay === 'Sunday') {
+      console.log(`Weekend detected - staying on GW${maxCompleted}`);
       return Math.min(maxCompleted, 38);
     }
     if (ukDay === 'Monday' && (hours === 0 && minutes === 0)) {
+      console.log(`Monday 00:00 detected - staying on GW${maxCompleted}`);
       return Math.min(maxCompleted, 38);
     }
 
     // Otherwise advance to next GW
+    console.log(`Advancing to GW${maxCompleted + 1}`);
     return Math.min(maxCompleted + 1, 38);
   } catch(e) {
     return 1;
