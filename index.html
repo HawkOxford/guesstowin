@@ -887,18 +887,24 @@ function formatMatchTime(utcDate) {
 
 async function estimateGWNumber(matches) {
   try {
-    const { data: resultRows } = await sb.from('results').select('gameweek,match_key').eq('status', 'finished').limit(5000);
+    const { data: resultRows } = await sb.from('results').select('gameweek,match_key,status').limit(5000);
     const validRows = (resultRows || []).filter(r => r.gameweek >= 1 && r.gameweek <= 38);
     if (!validRows.length) return 1;
 
-    // Count unique finished results per GW
-    const resultCounts = {};
+    // Count unique results per GW (both finished and all)
+    const finishedCounts = {};
+    const totalCounts = {};
     validRows.forEach(r => {
-      if (!resultCounts[r.gameweek]) resultCounts[r.gameweek] = new Set();
-      resultCounts[r.gameweek].add(r.match_key);
+      if (!totalCounts[r.gameweek]) totalCounts[r.gameweek] = new Set();
+      totalCounts[r.gameweek].add(r.match_key);
+
+      if (r.status === 'finished') {
+        if (!finishedCounts[r.gameweek]) finishedCounts[r.gameweek] = new Set();
+        finishedCounts[r.gameweek].add(r.match_key);
+      }
     });
 
-    // Determine expected fixture count per GW from predictions table
+    // Determine expected fixture count per GW from predictions table as fallback
     const { data: predRows } = await sb.from('predictions').select('gameweek,match_key').limit(10000);
     const fixtureCounts = {};
     (predRows || []).forEach(p => {
@@ -907,26 +913,35 @@ async function estimateGWNumber(matches) {
       fixtureCounts[p.gameweek].add(key);
     });
 
-    // For the highest GW we have results for, also factor in currentMatches
-    // so we never declare the current GW complete if not all fixtures have finished
-    const gwsWithResults = Object.keys(resultCounts).map(Number).sort((a,b) => a-b);
-    const highestGW = Math.max(...gwsWithResults);
-    const currentFixtureCount = currentMatches.length > 0 ? currentMatches.length : (fixtureCounts[highestGW] ? fixtureCounts[highestGW].size : 9);
-
+    // A GW is complete when all its fixtures (from results table) are finished
+    const gwsWithResults = Object.keys(totalCounts).map(Number).sort((a,b) => a-b);
     const completedGWs = gwsWithResults.filter(gw => {
-      const resultCount = resultCounts[gw].size;
-      // For the highest GW, use currentMatches count as authoritative fixture count
-      const expectedCount = gw === highestGW ? currentFixtureCount : (fixtureCounts[gw] ? fixtureCounts[gw].size : 9);
-      return resultCount >= expectedCount;
+      const finishedCount = finishedCounts[gw] ? finishedCounts[gw].size : 0;
+      // Use actual fixture count from results table (totalCounts), fallback to predictions
+      const expectedCount = totalCounts[gw] ? totalCounts[gw].size : (fixtureCounts[gw] ? fixtureCounts[gw].size : 10);
+      return finishedCount >= expectedCount;
     });
 
     if (!completedGWs.length) return 1;
     const maxCompleted = Math.max(...completedGWs);
-    // Don't advance to next GW until Monday UK time
-    const ukDayEst = new Date().toLocaleDateString('en-GB', {timeZone:'Europe/London', weekday:'long'});
-    if (ukDayEst === 'Saturday' || ukDayEst === 'Sunday') {
-      return Math.min(maxCompleted, 38); // stay on current GW over the weekend
+
+    // Get UK time including hours and minutes
+    const ukTime = new Date().toLocaleString('en-GB', {timeZone:'Europe/London', hour12:false});
+    const ukDay = new Date().toLocaleDateString('en-GB', {timeZone:'Europe/London', weekday:'long'});
+    const [datePart, timePart] = ukTime.split(', ');
+    const [hours, minutes] = timePart.split(':').map(Number);
+
+    // Stay on current (completed) GW if:
+    // - It's Saturday or Sunday
+    // - It's Monday but before 00:01
+    if (ukDay === 'Saturday' || ukDay === 'Sunday') {
+      return Math.min(maxCompleted, 38);
     }
+    if (ukDay === 'Monday' && (hours === 0 && minutes === 0)) {
+      return Math.min(maxCompleted, 38);
+    }
+
+    // Otherwise advance to next GW
     return Math.min(maxCompleted + 1, 38);
   } catch(e) {
     return 1;
