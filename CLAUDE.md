@@ -22,21 +22,51 @@ Use this file to onboard Claude at the start of a new conversation. Paste the co
 
 ---
 
-## Late Entry Rule
+## Prediction Deadline Rules — VERIFIED WORKING ✅
 
-**Rule:** If a player has submitted ZERO predictions before the first kickoff, they can still submit predictions for matches that haven't started yet.
+**Two rules govern when predictions can be submitted:**
 
-**Status:** ✅ WORKING — Verified 22 April 2026
+**RULE A — Player HAS submitted at least one prediction before first kickoff:**
+- All matches lock at first kickoff (deadline)
+- Player cannot edit any predictions after first kickoff
+- Standard behavior for players who remembered to predict
 
-**Implementation (index.html, lines 1589-1677):**
-- Detects if player has any predictions: `hasAnyPreds = Object.values(myPreds).some(p => p.home !== null && ...)`
-- Per-match locking logic (line 1677): `matchLocked = hasAnyPreds ? deadlinePassed : matchStarted`
-- If player has any predictions: all matches lock at first kickoff (standard rule)
-- If player has zero predictions: individual matches lock when they start
-- Save button shows when `(isOpen || (!hasAnyPreds && deadlinePassed))` (line 1633)
-- Displays warning: "⚠ Late entry — games already started are locked" (line 1636)
+**RULE B — Player has NOT submitted any predictions before first kickoff:**
+- Individual matches lock as they kick off
+- Matches that have not yet started remain open for prediction
+- Player can still submit predictions for future matches in the gameweek
+- Grace period for players who forgot completely
+- Anti-gaming: can't wait to see Saturday results then predict Sunday (only works if zero predictions submitted)
 
-**Why:** Gives players a grace period if they forgot completely, but prevents gaming the system by waiting to see early results.
+**Status:** ✅ VERIFIED — Both rules working correctly (tested 22 April 2026)
+
+**Implementation (index.html):**
+
+1. **Detection logic** (line 1589):
+   ```javascript
+   const hasAnyPreds = Object.values(myPreds).some(p => 
+     p.home !== null && p.home !== undefined && p.away !== null && p.away !== undefined
+   );
+   ```
+
+2. **Per-match locking** (line 1677):
+   ```javascript
+   const matchLocked = hasAnyPreds ? deadlinePassed : matchStarted;
+   ```
+   - Rule A: `hasAnyPreds = true` → `matchLocked = deadlinePassed` (all matches lock at first kickoff)
+   - Rule B: `hasAnyPreds = false` → `matchLocked = matchStarted` (individual match locking)
+
+3. **Save button visibility** (line 1633):
+   ```javascript
+   ${(isOpen || (!hasAnyPreds && deadlinePassed)) ? `<div class="save-bar">
+   ```
+   - Shows before deadline (normal entry)
+   - OR shows after deadline if player has zero predictions (late entry)
+   - Displays warning when in late entry mode: "⚠ Late entry — games already started are locked"
+
+4. **Input field display** (line 1677):
+   - Uses `matchLocked` to determine whether to show input fields or read-only scores
+   - Correctly implements both Rule A and Rule B
 
 ---
 
