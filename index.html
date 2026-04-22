@@ -308,13 +308,7 @@
   <!-- Admin Tab -->
   <div id="tab-admin" class="tab-content">
     <div class="main">
-      <div id="admin-pin-screen" style="max-width:300px;margin:2rem auto;text-align:center">
-        <div style="font-size:0.62rem;font-weight:700;letter-spacing:0.2em;text-transform:uppercase;color:var(--green);margin-bottom:1rem">Admin Access</div>
-        <input id="admin-pin-input" type="password" class="auth-input" placeholder="Enter PIN" onkeydown="if(event.key==='Enter')checkAdminPin()" style="text-align:center;letter-spacing:0.3em">
-        <button class="auth-btn" onclick="checkAdminPin()">Unlock</button>
-        <div id="admin-pin-error" style="color:var(--red);font-size:0.75rem;margin-top:0.5rem;display:none">Incorrect PIN</div>
-      </div>
-      <div id="admin-content" style="display:none">
+      <div id="admin-content">
         <div id="admin-section"></div>
       </div>
     </div>
@@ -460,13 +454,7 @@ function switchTab(tab,btn) {
   if(tab==='leaderboard') renderLeaderboard();
   if(tab==='tracker') renderTracker();
   if(tab==='scores' && !currentUser) fetchAndRenderFixtures();
-  if(tab==='admin') {
-    // Reset pin screen each time tab is opened
-    document.getElementById('admin-pin-screen').style.display = '';
-    document.getElementById('admin-content').style.display = 'none';
-    document.getElementById('admin-pin-input').value = '';
-    document.getElementById('admin-pin-error').style.display = 'none';
-  }
+  if(tab==='admin') renderAdmin();
 }
 
 // Auto-refresh leaderboard every 60s during live weekend regardless of active tab
@@ -1914,21 +1902,6 @@ function startCountdown(deadline) {
 }
 
 // ── Admin ─────────────────────────────────────────────────────────────────────
-const ADMIN_PIN = 'hawk1993';
-let adminUnlocked = false;
-
-function checkAdminPin() {
-  const val = document.getElementById('admin-pin-input').value;
-  if (val === ADMIN_PIN) {
-    adminUnlocked = true;
-    document.getElementById('admin-pin-screen').style.display = 'none';
-    document.getElementById('admin-content').style.display = '';
-    renderAdmin();
-  } else {
-    document.getElementById('admin-pin-error').style.display = '';
-  }
-}
-
 async function renderAdmin() {
   const section = document.getElementById('admin-section');
   section.innerHTML = '<div class="state-box"><div class="spinner"></div><div>Loading admin data…</div></div>';
@@ -2004,24 +1977,28 @@ async function renderAdmin() {
   const fixtureCount = currentMatches.length || 8;
 
   section.innerHTML = `
-    <div class="section-label">GW Status</div>
-    <div style="background:var(--card);border:1px solid var(--border);border-radius:8px;padding:1rem;margin-bottom:1.5rem;font-size:0.8rem;display:flex;gap:2rem;flex-wrap:wrap">
-      <div><span style="color:var(--muted)">Current GW</span><br><strong style="font-size:1.2rem;font-family:'Bebas Neue',sans-serif;color:var(--green)">${currentGW||'—'}</strong></div>
-      <div><span style="color:var(--muted)">Fixtures loaded</span><br><strong style="font-size:1.2rem;font-family:'Bebas Neue',sans-serif;color:var(--green)">${currentMatches.length}</strong></div>
-      <div><span style="color:var(--muted)">Deadline passed</span><br><strong style="font-size:1.2rem;font-family:'Bebas Neue',sans-serif;color:${deadlinePassed?'var(--green)':'var(--amber)'}">${deadlinePassed?'Yes':'No'}</strong></div>
-      <div><span style="color:var(--muted)">Live results cached</span><br><strong style="font-size:1.2rem;font-family:'Bebas Neue',sans-serif;color:var(--green)">${Object.keys(liveResults).length}</strong></div>
+    <div style="text-align:center;margin-bottom:2rem">
+      <h1 style="font-family:'Bebas Neue',sans-serif;font-size:3rem;background:linear-gradient(135deg,var(--green),var(--gold),var(--green));-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;margin:0;letter-spacing:0.1em;text-shadow:0 0 40px rgba(0,255,135,0.3)">⚡ ADMIN CONTROL CENTER ⚡</h1>
     </div>
 
-    <div class="section-label">Manual Controls</div>
-    <div style="display:flex;gap:0.75rem;flex-wrap:wrap;margin-bottom:1.5rem">
-      <button class="btn-save" onclick="adminSync()" style="padding:0.5rem 1.2rem;font-size:0.8rem">↻ Sync live results now</button>
-      <button class="btn-save" onclick="renderAdmin()" style="padding:0.5rem 1.2rem;font-size:0.8rem;background:var(--bg3);color:var(--text)">↻ Refresh admin</button>
-      <button class="btn-save" id="season-toggle-btn" onclick="toggleSeasonEnded()" style="padding:0.5rem 1.2rem;font-size:0.8rem;background:rgba(255,213,79,0.15);color:var(--gold);border:1px solid rgba(255,213,79,0.3)">🏅 Enable Season Review tab</button>
+    <div class="section-label" style="background:linear-gradient(90deg,var(--green),var(--gold));-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text">🎮 GW Status</div>
+    <div style="background:linear-gradient(135deg,rgba(0,255,135,0.05),rgba(255,213,79,0.05));border:2px solid var(--green);border-radius:12px;padding:1.25rem;margin-bottom:1.5rem;font-size:0.8rem;display:flex;gap:2rem;flex-wrap:wrap;box-shadow:0 4px 20px rgba(0,255,135,0.15)">
+      <div><span style="color:var(--muted);font-size:0.7rem;text-transform:uppercase;letter-spacing:0.1em">Current GW</span><br><strong style="font-size:1.5rem;font-family:'Bebas Neue',sans-serif;color:var(--green);text-shadow:0 0 20px rgba(0,255,135,0.5)">${currentGW||'—'}</strong></div>
+      <div><span style="color:var(--muted);font-size:0.7rem;text-transform:uppercase;letter-spacing:0.1em">Fixtures loaded</span><br><strong style="font-size:1.5rem;font-family:'Bebas Neue',sans-serif;color:var(--green);text-shadow:0 0 20px rgba(0,255,135,0.5)">${currentMatches.length}</strong></div>
+      <div><span style="color:var(--muted);font-size:0.7rem;text-transform:uppercase;letter-spacing:0.1em">Deadline passed</span><br><strong style="font-size:1.5rem;font-family:'Bebas Neue',sans-serif;color:${deadlinePassed?'var(--green)':'var(--amber)'};text-shadow:0 0 20px ${deadlinePassed?'rgba(0,255,135,0.5)':'rgba(255,213,79,0.5)'}">${deadlinePassed?'✓ Yes':'✗ No'}</strong></div>
+      <div><span style="color:var(--muted);font-size:0.7rem;text-transform:uppercase;letter-spacing:0.1em">Live results cached</span><br><strong style="font-size:1.5rem;font-family:'Bebas Neue',sans-serif;color:var(--green);text-shadow:0 0 20px rgba(0,255,135,0.5)">${Object.keys(liveResults).length}</strong></div>
     </div>
-    <div id="admin-sync-msg" style="font-size:0.75rem;color:var(--green);margin-bottom:1rem;display:none">✓ Sync triggered</div>
+
+    <div class="section-label" style="background:linear-gradient(90deg,var(--gold),var(--green));-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text">🎛️ Manual Controls</div>
+    <div style="display:flex;gap:0.75rem;flex-wrap:wrap;margin-bottom:1.5rem">
+      <button class="btn-save" onclick="adminSync()" style="padding:0.65rem 1.4rem;font-size:0.85rem;background:linear-gradient(135deg,var(--green),rgba(0,255,135,0.7));border:none;box-shadow:0 4px 15px rgba(0,255,135,0.3);font-weight:600">🔄 Sync live results now</button>
+      <button class="btn-save" onclick="renderAdmin()" style="padding:0.65rem 1.4rem;font-size:0.85rem;background:var(--bg3);color:var(--text);border:2px solid var(--border);font-weight:600">↻ Refresh admin</button>
+      <button class="btn-save" id="season-toggle-btn" onclick="toggleSeasonEnded()" style="padding:0.65rem 1.4rem;font-size:0.85rem;background:linear-gradient(135deg,var(--gold),rgba(255,213,79,0.7));color:var(--dark);border:none;box-shadow:0 4px 15px rgba(255,213,79,0.3);font-weight:600">🏆 Enable Season Review tab</button>
+    </div>
+    <div id="admin-sync-msg" style="font-size:0.8rem;color:var(--green);margin-bottom:1rem;display:none;padding:0.5rem;background:rgba(0,255,135,0.1);border-radius:6px;border:1px solid var(--green)">✓ Sync triggered</div>
 
     ${currentGW ? `
-    <div class="section-label">GW${currentGW} Submissions</div>
+    <div class="section-label" style="background:linear-gradient(90deg,var(--green),var(--amber));-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text">📝 GW${currentGW} Submissions</div>
     <div style="background:var(--card);border:1px solid var(--border);border-radius:8px;overflow:hidden;margin-bottom:1.5rem">
       ${PLAYERS.map(name => {
         const count = subMap[currentGW]?.[name] || 0;
@@ -2108,29 +2085,41 @@ async function renderAdmin() {
       })()}
     </div>
 
-    <div class="section-label">Points by Gameweek</div>
-    <div style="background:var(--card);border:1px solid var(--border);border-radius:8px;overflow:auto;margin-bottom:1.5rem">
+    <div class="section-label" style="background:linear-gradient(135deg,var(--green),var(--gold));-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text">📊 Points by Gameweek</div>
+    <div style="background:linear-gradient(135deg,rgba(0,255,135,0.03),rgba(255,213,79,0.03));border:2px solid var(--border);border-radius:12px;overflow:auto;margin-bottom:1.5rem;box-shadow:0 4px 20px rgba(0,255,135,0.1)">
       <table style="width:100%;border-collapse:collapse;font-size:0.75rem;min-width:500px">
         <thead>
-          <tr>
-            <th style="padding:0.5rem 1rem;text-align:left;color:var(--muted);font-size:0.65rem;letter-spacing:0.08em;text-transform:uppercase;border-bottom:1px solid var(--border)">Player</th>
-            ${allGWs.map(gw => `<th style="padding:0.5rem 0.75rem;text-align:center;color:var(--muted);font-size:0.65rem;letter-spacing:0.08em;text-transform:uppercase;border-bottom:1px solid var(--border)">GW${gw}</th>`).join('')}
-            <th style="padding:0.5rem 0.75rem;text-align:center;color:var(--green);font-size:0.65rem;letter-spacing:0.08em;text-transform:uppercase;border-bottom:1px solid var(--border)">Base</th>
-            <th style="padding:0.5rem 0.75rem;text-align:center;color:var(--green);font-size:0.65rem;letter-spacing:0.08em;text-transform:uppercase;border-bottom:1px solid var(--border)">Total</th>
+          <tr style="background:linear-gradient(90deg,rgba(0,255,135,0.1),rgba(255,213,79,0.1))">
+            <th style="padding:0.75rem 1rem;text-align:left;color:var(--green);font-size:0.7rem;letter-spacing:0.1em;text-transform:uppercase;border-bottom:2px solid var(--green)">Player (Total)</th>
+            ${allGWs.map(gw => `<th style="padding:0.75rem 0.5rem;text-align:center;color:var(--muted);font-size:0.65rem;letter-spacing:0.08em;text-transform:uppercase;border-bottom:2px solid var(--green)">GW${gw}</th>`).join('')}
+            <th style="padding:0.75rem 0.75rem;text-align:center;color:var(--gold);font-size:0.7rem;letter-spacing:0.08em;text-transform:uppercase;border-bottom:2px solid var(--green)">🏆 Total</th>
           </tr>
         </thead>
         <tbody>
-          ${PLAYERS.map(name => {
-            const gwPts = gwPoints[name] || {};
-            const supabasePts = Object.values(gwPts).reduce((a,b)=>a+b,0);
-            const total = supabasePts;
-            return `<tr>
-              <td style="padding:0.5rem 1rem;font-weight:500;border-bottom:1px solid rgba(31,46,31,0.3)">${name}</td>
-              ${allGWs.map(gw => `<td style="padding:0.5rem 0.75rem;text-align:center;border-bottom:1px solid rgba(31,46,31,0.3);color:${gwPts[gw]?'var(--green)':'var(--muted)'}">${gwPts[gw]??'–'}</td>`).join('')}
-              <td style="padding:0.5rem 0.75rem;text-align:center;border-bottom:1px solid rgba(31,46,31,0.3);color:var(--muted)">—</td>
-              <td style="padding:0.5rem 0.75rem;text-align:center;border-bottom:1px solid rgba(31,46,31,0.3);font-family:'Bebas Neue',sans-serif;font-size:1.1rem;color:var(--green)">${total}</td>
-            </tr>`;
-          }).join('')}
+          ${(() => {
+            // Build array with totals and sort by total descending
+            const playerData = PLAYERS.map(name => {
+              const gwPts = gwPoints[name] || {};
+              const total = Object.values(gwPts).reduce((a,b)=>a+b,0);
+              return { name, gwPts, total };
+            }).sort((a,b) => b.total - a.total);
+
+            // Render sorted rows
+            return playerData.map((p, idx) => {
+              const rankColor = idx === 0 ? 'var(--gold)' : idx === 1 ? 'var(--silver)' : idx === 2 ? 'var(--bronze)' : 'var(--text)';
+              const rankEmoji = idx === 0 ? '🥇' : idx === 1 ? '🥈' : idx === 2 ? '🥉' : '';
+              return `<tr style="background:${idx % 2 === 0 ? 'rgba(0,0,0,0.1)' : 'transparent'}">
+                <td style="padding:0.75rem 1rem;font-weight:600;border-bottom:1px solid rgba(31,46,31,0.2);color:${rankColor}">${rankEmoji} ${p.name} <span style="color:var(--green);font-family:'Bebas Neue',sans-serif;font-size:1rem">(${p.total})</span></td>
+                ${allGWs.map(gw => {
+                  const pts = p.gwPts[gw];
+                  const cellColor = pts >= 9 ? 'var(--gold)' : pts >= 6 ? 'var(--green)' : pts ? 'var(--text)' : 'var(--muted)';
+                  const cellWeight = pts >= 9 ? '700' : pts >= 6 ? '600' : '400';
+                  return `<td style="padding:0.75rem 0.5rem;text-align:center;border-bottom:1px solid rgba(31,46,31,0.2);color:${cellColor};font-weight:${cellWeight}">${pts??'–'}</td>`;
+                }).join('')}
+                <td style="padding:0.75rem 0.75rem;text-align:center;border-bottom:1px solid rgba(31,46,31,0.2);font-family:'Bebas Neue',sans-serif;font-size:1.2rem;color:${rankColor};text-shadow:0 0 10px ${rankColor}40">${p.total}</td>
+              </tr>`;
+            }).join('');
+          })()}
         </tbody>
       </table>
     </div>
