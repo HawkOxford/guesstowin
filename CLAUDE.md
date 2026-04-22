@@ -26,10 +26,15 @@ Use this file to onboard Claude at the start of a new conversation. Paste the co
 
 **Rule:** If a player has submitted ZERO predictions before the first kickoff, they can still submit predictions for matches that haven't started yet.
 
-**Implementation:**
-- Check if player has any predictions for the current GW: `SELECT COUNT(*) FROM predictions WHERE user_id = X AND gameweek = Y`
-- If count = 0, allow predictions for individual matches where `utc_date` > now()
-- If count > 0, all remaining matches lock at first kickoff (standard rule)
+**Status:** ✅ WORKING — Verified 22 April 2026
+
+**Implementation (index.html, lines 1589-1677):**
+- Detects if player has any predictions: `hasAnyPreds = Object.values(myPreds).some(p => p.home !== null && ...)`
+- Per-match locking logic (line 1677): `matchLocked = hasAnyPreds ? deadlinePassed : matchStarted`
+- If player has any predictions: all matches lock at first kickoff (standard rule)
+- If player has zero predictions: individual matches lock when they start
+- Save button shows when `(isOpen || (!hasAnyPreds && deadlinePassed))` (line 1633)
+- Displays warning: "⚠ Late entry — games already started are locked" (line 1636)
 
 **Why:** Gives players a grace period if they forgot completely, but prevents gaming the system by waiting to see early results.
 
