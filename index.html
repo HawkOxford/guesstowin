@@ -349,7 +349,32 @@ const HISTORICAL_GW_POINTS = {
 
 
 let currentUser = null;
-const crestCache = {}; // team name -> crest URL, built from API data
+
+// PL 2025/26 Season - Hardcoded crest URLs (stable, never change)
+// Fetched from football-data.org API on 22 April 2026
+// No longer dependent on API calls - crests always available
+const crestCache = {
+  "Arsenal FC": "https://crests.football-data.org/57.png",
+  "Aston Villa FC": "https://crests.football-data.org/58.png",
+  "Chelsea FC": "https://crests.football-data.org/61.png",
+  "Everton FC": "https://crests.football-data.org/62.png",
+  "Fulham FC": "https://crests.football-data.org/63.png",
+  "Liverpool FC": "https://crests.football-data.org/64.png",
+  "Manchester City FC": "https://crests.football-data.org/65.png",
+  "Manchester United FC": "https://crests.football-data.org/66.png",
+  "Newcastle United FC": "https://crests.football-data.org/67.png",
+  "Sunderland AFC": "https://crests.football-data.org/71.png",
+  "Tottenham Hotspur FC": "https://crests.football-data.org/73.png",
+  "Wolverhampton Wanderers FC": "https://crests.football-data.org/76.png",
+  "Burnley FC": "https://crests.football-data.org/328.png",
+  "Leeds United FC": "https://crests.football-data.org/341.png",
+  "Nottingham Forest FC": "https://crests.football-data.org/351.png",
+  "Crystal Palace FC": "https://crests.football-data.org/354.png",
+  "Brighton & Hove Albion FC": "https://crests.football-data.org/397.png",
+  "Brentford FC": "https://crests.football-data.org/402.png",
+  "West Ham United FC": "https://crests.football-data.org/563.png",
+  "AFC Bournemouth": "https://crests.football-data.org/bournemouth.png"
+};
 
 let currentPlayerName = '';
 let currentGW = null;
