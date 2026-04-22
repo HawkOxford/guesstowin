@@ -40,6 +40,34 @@ Use this file to onboard Claude at the start of a new conversation. Paste the co
 
 ---
 
+## CLAUDE.md Maintenance Rules — MUST FOLLOW
+
+**This file is the source of truth.** Keep it complete and accurate after every change.
+
+**Rules:**
+1. **Update after every change** — feature, bug fix, config change, database update, anything that affects the project
+2. **New feature** → document in "Known Bugs Fixed" (if it was broken) or add a dated note in relevant section
+3. **Bug fix** → add to "Known Bugs Fixed" section with symptom, cause, and fix
+4. **Superseding changes** → update or remove the old entry to avoid contradictions (e.g., if API key changes, update the relevant section, don't duplicate)
+5. **Outstanding tasks** → update "Pending Code Improvements" or other task sections when items are completed
+6. **Push with every commit** — CLAUDE.md should be committed alongside code changes so it stays in sync with the repo
+7. **Goal** — anyone reading CLAUDE.md should have a complete and accurate picture of the project state, no detective work needed
+
+**What to document:**
+- Features added (what, why, how it works)
+- Bugs fixed (symptom, root cause, solution)
+- Database changes (manual SQL fixes, cleanup operations)
+- Configuration changes (API keys, Edge Function deployments)
+- Code structure changes (major refactoring, new patterns)
+- Lessons learned (technical decisions, things that didn't work, gotchas to avoid)
+
+**What NOT to document:**
+- Trivial typo fixes (unless they caused a production bug)
+- Formatting-only changes (linting, whitespace)
+- Minor UI tweaks that don't change behavior
+
+---
+
 Project Overview
 Guess to Win 2025/26 — A Premier League score prediction game for a private group of 10 players. Built as a single HTML file hosted on GitHub Pages with Supabase as the backend.
 Live site: https://hawkoxford.github.io/guesstowin
