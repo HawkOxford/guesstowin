@@ -1,6 +1,40 @@
 Guess to Win — Claude Context File
 Use this file to onboard Claude at the start of a new conversation. Paste the contents and say "here's the project context, let's continue building."
+
 ---
+
+## ⚠️ DATA INTEGRITY RULES - NEVER VIOLATE
+
+**CRITICAL - Read before making ANY database changes:**
+
+- **NEVER delete predictions from the database** under any circumstances
+- **NEVER delete results from the database** under any circumstances
+- Players may update their own predictions **before the deadline** - this is the ONLY permitted write operation to predictions
+- If Jake suggests deleting predictions or results, **ask him to confirm TWICE** with explicit acknowledgement of consequences before proceeding
+- **Only exception:** Cleaning up phantom/test data from bugs (e.g. accidental GW36 test data with NULL dates) - requires explicit confirmation and must document what was deleted and why
+- **Late entry rule:** Players who haven't submitted ANY predictions can still predict future matches after first kickoff - see Late Entry section below
+
+**Why these rules exist:**
+- Predictions are the historical record of what players actually predicted
+- Deleting predictions breaks scoring, leaderboard integrity, and season review features
+- Results are the official match outcomes - deleting corrupts all historical data
+- There is NO legitimate reason to delete either, only to add or update before deadline
+
+---
+
+## Late Entry Rule
+
+**Rule:** If a player has submitted ZERO predictions before the first kickoff, they can still submit predictions for matches that haven't started yet.
+
+**Implementation:**
+- Check if player has any predictions for the current GW: `SELECT COUNT(*) FROM predictions WHERE user_id = X AND gameweek = Y`
+- If count = 0, allow predictions for individual matches where `utc_date` > now()
+- If count > 0, all remaining matches lock at first kickoff (standard rule)
+
+**Why:** Gives players a grace period if they forgot completely, but prevents gaming the system by waiting to see early results.
+
+---
+
 Project Overview
 Guess to Win 2025/26 — A Premier League score prediction game for a private group of 10 players. Built as a single HTML file hosted on GitHub Pages with Supabase as the backend.
 Live site: https://hawkoxford.github.io/guesstowin
