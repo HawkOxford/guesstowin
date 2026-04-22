@@ -1947,8 +1947,9 @@ async function renderAdmin() {
   const profileMap = {};
   (profiles||[]).forEach(p => profileMap[p.id] = p.player_name);
 
-  // Get all GWs
+  // Get all GWs (ensure we include 1-28 even if not all in Supabase yet)
   const allGWs = [...new Set([
+    ...Array.from({length: 28}, (_, i) => i + 1), // GW1-28
     ...(preds||[]).map(p => p.gameweek),
     ...(results||[]).map(r => r.gameweek)
   ])].sort((a,b) => a-b);
@@ -1964,10 +1965,22 @@ async function renderAdmin() {
   });
 
   // Build points per player per GW
+  // Start with HISTORICAL_GW_POINTS for GW1-26
   const gwPoints = {};
+  PLAYERS.forEach(name => {
+    const hist = HISTORICAL_GW_POINTS[name] || {};
+    Object.entries(hist).forEach(([gw, pts]) => {
+      if (!gwPoints[name]) gwPoints[name] = {};
+      gwPoints[name][parseInt(gw)] = pts;
+    });
+  });
+
+  // Add Supabase calculated points for GW27+
   (preds||[]).forEach(p => {
     const name = profileMap[p.user_id];
     if (!name || !PLAYERS.includes(name)) return;
+    // Only use Supabase calculated points for GW27+
+    if (p.gameweek < 27) return;
     const key = p.match_key.replace(/^\d+_/, '');
     const r = resultMap[`${p.gameweek}_${key}`];
     if (!r) return;
