@@ -2017,12 +2017,11 @@ async function renderAdmin() {
     <div class="section-label" style="background:linear-gradient(90deg,var(--gold),var(--green));-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text">🎛️ Manual Controls</div>
     <div style="display:flex;gap:0.75rem;flex-wrap:wrap;margin-bottom:1.5rem">
       <button class="btn-save" onclick="adminSync()" style="padding:0.65rem 1.4rem;font-size:0.85rem;background:linear-gradient(135deg,var(--green),rgba(0,255,135,0.7));border:none;box-shadow:0 4px 15px rgba(0,255,135,0.3);font-weight:600">🔄 Sync live results now</button>
-      <button class="btn-save" onclick="sendDeadlineReminder()" style="padding:0.65rem 1.4rem;font-size:0.85rem;background:linear-gradient(135deg,var(--amber),rgba(255,183,77,0.7));border:none;box-shadow:0 4px 15px rgba(255,183,77,0.3);font-weight:600">📧 Send deadline reminder</button>
       <button class="btn-save" onclick="renderAdmin()" style="padding:0.65rem 1.4rem;font-size:0.85rem;background:var(--bg3);color:var(--text);border:2px solid var(--border);font-weight:600">↻ Refresh admin</button>
       <button class="btn-save" id="season-toggle-btn" onclick="toggleSeasonEnded()" style="padding:0.65rem 1.4rem;font-size:0.85rem;background:linear-gradient(135deg,var(--gold),rgba(255,213,79,0.7));color:var(--dark);border:none;box-shadow:0 4px 15px rgba(255,213,79,0.3);font-weight:600">🏆 Enable Season Review tab</button>
     </div>
+    <div style="font-size:0.75rem;color:var(--muted);margin-bottom:1.5rem;padding:0.5rem;background:rgba(255,183,77,0.05);border-radius:6px;border-left:3px solid var(--amber)">📧 Deadline reminder emails send automatically 24 hours before first kickoff (cron job)</div>
     <div id="admin-sync-msg" style="font-size:0.8rem;color:var(--green);margin-bottom:1rem;display:none;padding:0.5rem;background:rgba(0,255,135,0.1);border-radius:6px;border:1px solid var(--green)">✓ Sync triggered</div>
-    <div id="admin-email-msg" style="font-size:0.8rem;color:var(--amber);margin-bottom:1rem;display:none;padding:0.5rem;background:rgba(255,183,77,0.1);border-radius:6px;border:1px solid var(--amber)"></div>
 
     ${currentGW ? `
     <div class="section-label" style="background:linear-gradient(90deg,var(--green),var(--amber));-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text">📝 GW${currentGW} Submissions</div>
@@ -2160,45 +2159,6 @@ async function adminSync() {
     document.getElementById('admin-sync-msg').style.display = 'none';
     renderAdmin();
   }, 3000);
-}
-
-async function sendDeadlineReminder() {
-  const msgEl = document.getElementById('admin-email-msg');
-  msgEl.textContent = '📧 Sending deadline reminder emails...';
-  msgEl.style.display = '';
-
-  try {
-    const response = await fetch('https://iufbdwsmbwrtcqzkvyey.supabase.co/functions/v1/send-deadline-reminder', {
-      method: 'POST',
-      headers: {
-        'Authorization': 'Bearer ' + SUPABASE_ANON_KEY,
-        'Content-Type': 'application/json'
-      }
-    });
-
-    const data = await response.json();
-
-    if (data.success) {
-      msgEl.textContent = `✓ Sent ${data.emails_sent} of ${data.emails_total} emails for GW${data.gameweek}`;
-      msgEl.style.color = 'var(--green)';
-      msgEl.style.background = 'rgba(0,255,135,0.1)';
-      msgEl.style.borderColor = 'var(--green)';
-    } else {
-      msgEl.textContent = `✗ Failed: ${data.error}`;
-      msgEl.style.color = 'var(--red)';
-      msgEl.style.background = 'rgba(255,82,82,0.1)';
-      msgEl.style.borderColor = 'var(--red)';
-    }
-  } catch (error) {
-    msgEl.textContent = `✗ Error: ${error.message}`;
-    msgEl.style.color = 'var(--red)';
-    msgEl.style.background = 'rgba(255,82,82,0.1)';
-    msgEl.style.borderColor = 'var(--red)';
-  }
-
-  setTimeout(() => {
-    msgEl.style.display = 'none';
-  }, 10000);
 }
 
 // ── Boot ──────────────────────────────────────────────────────────────────────

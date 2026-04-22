@@ -98,6 +98,64 @@ Use this file to onboard Claude at the start of a new conversation. Paste the co
 
 ---
 
+## Deadline Reminder Emails — Automatic Cron Job ✅
+
+**Status:** Configured (22 April 2026)
+
+**How it works:**
+- Cron job runs Edge Function every hour: `send-deadline-reminder`
+- Function checks if first kickoff is within 24-25 hours (1-hour window)
+- Function checks `email_log` table to see if reminder already sent for this GW
+- If both checks pass, sends emails to all 10 players via Resend API
+- Logs send to `email_log` table to prevent duplicates
+
+**Implementation:**
+
+1. **Edge Function:** `supabase/functions/send-deadline-reminder/index.ts`
+   - Checks time window: `23 < hours_until_kickoff < 25`
+   - Checks email_log for existing send
+   - Fetches upcoming fixtures and current standings
+   - Sends branded email to all players
+   - Logs to email_log table
+
+2. **Database Table:** `email_log` (created by migration `20260422_deadline_reminder_cron.sql`)
+   - Columns: gameweek, email_type, sent_at, success, error_message
+   - Unique constraint on (gameweek, email_type) prevents duplicates
+   - RLS: authenticated users can read, service role can insert
+
+3. **Cron Schedule:** `0 * * * *` (every hour on the hour)
+   - Configured in Supabase Dashboard → Database → Cron Jobs
+   - Calls Edge Function via `net.http_post()` with service role key
+   - See `supabase/functions/send-deadline-reminder/README.md` for setup instructions
+
+4. **Email Template:**
+   - Dark theme with GTW branding (GUESS TO WIN. logo, green accents)
+   - Shows upcoming fixtures for the gameweek
+   - Shows current league standings (motivational)
+   - Link to hawkoxford.github.io/guesstowin
+   - Sent via Resend API (requires `RESEND_API_KEY` secret)
+
+**Manual override removed:** Previous manual "Send deadline reminder" button in Admin tab was removed. Emails now send automatically - no manual trigger needed.
+
+**Testing:**
+```bash
+# Manual test (ignores schedule checks - will send regardless of time window)
+curl -X POST https://iufbdwsmbwrtcqzkvyey.supabase.co/functions/v1/send-deadline-reminder \
+  -H "Authorization: Bearer <ANON_KEY>"
+
+# Check email log
+SELECT * FROM email_log ORDER BY sent_at DESC;
+
+# Clear log for re-testing
+DELETE FROM email_log WHERE gameweek = 29;
+```
+
+**Player emails hardcoded:**
+- Jake: jake14vanags@gmail.com
+- Glurk, Josh, Richard, Teflon, Alex, Gaz, Liam, Craig, Marcus: Placeholder addresses (update in Edge Function before using)
+
+---
+
 Project Overview
 Guess to Win 2025/26 — A Premier League score prediction game for a private group of 10 players. Built as a single HTML file hosted on GitHub Pages with Supabase as the backend.
 Live site: https://hawkoxford.github.io/guesstowin

@@ -49,7 +49,7 @@ serve(async (req) => {
 
     if (weekendMatches.length === 0) {
       return new Response(
-        JSON.stringify({ success: false, error: 'No upcoming weekend fixtures found' }),
+        JSON.stringify({ success: false, error: 'No upcoming weekend fixtures found', skipped: true }),
         { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
@@ -77,6 +77,43 @@ serve(async (req) => {
     const finishedGWs = new Set((results || []).map((r: any) => r.gameweek));
     const maxFinishedGW = finishedGWs.size > 0 ? Math.max(...Array.from(finishedGWs)) : 26;
     const currentGW = maxFinishedGW + 1;
+
+    // CHECK 1: Are we within 24-25 hours of first kickoff? (1-hour window for cron)
+    const now = new Date();
+    const hoursUntilKickoff = (firstKickoff.getTime() - now.getTime()) / (1000 * 60 * 60);
+
+    if (hoursUntilKickoff > 25 || hoursUntilKickoff < 23) {
+      return new Response(
+        JSON.stringify({
+          success: false,
+          skipped: true,
+          reason: 'Outside 24-hour reminder window',
+          hours_until_kickoff: hoursUntilKickoff.toFixed(2),
+          gameweek: currentGW
+        }),
+        { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
+    // CHECK 2: Has reminder already been sent for this gameweek?
+    const { data: existingLog } = await supabase
+      .from('email_log')
+      .select('id')
+      .eq('gameweek', currentGW)
+      .eq('email_type', 'deadline_reminder')
+      .single();
+
+    if (existingLog) {
+      return new Response(
+        JSON.stringify({
+          success: false,
+          skipped: true,
+          reason: 'Reminder already sent for this gameweek',
+          gameweek: currentGW
+        }),
+        { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
 
     // Get all player emails
     const { data: profiles, error: profilesError } = await supabase
@@ -275,6 +312,14 @@ serve(async (req) => {
 
     const results_send = await Promise.all(emailPromises);
     const sentCount = results_send.filter((r) => r.sent).length;
+
+    // Log the email send to email_log table
+    await supabase.from('email_log').insert({
+      gameweek: currentGW,
+      email_type: 'deadline_reminder',
+      success: sentCount > 0,
+      error_message: sentCount === 0 ? 'No emails sent successfully' : null
+    });
 
     return new Response(
       JSON.stringify({
