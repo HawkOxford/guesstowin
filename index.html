@@ -489,7 +489,8 @@ setInterval(() => {
 
 // ── Scoring logic ─────────────────────────────────────────────────────────────
 function calcPoints(predH, predA, actH, actA) {
-  if(predH===undefined||predA===undefined||actH===null||actA===null) return null;
+  // Check for null or undefined on predictions and results (use == to catch both)
+  if(predH==null||predA==null||actH==null||actA==null) return null;
   if(predH===actH && predA===actA) return 3;
   const predResult = predH>predA?'H':predH<predA?'A':'D';
   const actResult  = actH>actA?'H':actH<actA?'A':'D';
@@ -532,9 +533,10 @@ async function renderLeaderboard() {
       if(!name) return;
       const r = resultMap[`${p.gameweek}_${p.match_key}`];
       if(!r) return;
-      // Only use Supabase calculated points for GW27+ 
+      // Only use Supabase calculated points for GW27+
       if(p.gameweek < 27) return;
-      const pts = calcPoints(p.home_score??0, p.away_score??0, r.home_score, r.away_score);
+      // Don't use ??0 - let calcPoints properly detect null/undefined predictions
+      const pts = calcPoints(p.home_score, p.away_score, r.home_score, r.away_score);
       if(pts===null) return;
       if(!gwPoints[name]) gwPoints[name]={};
       gwPoints[name][p.gameweek] = (gwPoints[name][p.gameweek]||0) + pts;
@@ -1981,7 +1983,8 @@ async function renderAdmin() {
     const key = p.match_key.replace(/^\d+_/, '');
     const r = resultMap[`${p.gameweek}_${key}`];
     if (!r) return;
-    const pts = calcPoints(p.home_score??0, p.away_score??0, r.home_score, r.away_score);
+    // Don't use ??0 - let calcPoints properly detect null/undefined predictions
+    const pts = calcPoints(p.home_score, p.away_score, r.home_score, r.away_score);
     if (pts === null) return;
     if (!gwPoints[name]) gwPoints[name] = {};
     gwPoints[name][p.gameweek] = (gwPoints[name][p.gameweek]||0) + pts;
@@ -1992,8 +1995,9 @@ async function renderAdmin() {
   (preds||[]).forEach(p => {
     const name = profileMap[p.user_id];
     if (!name || !PLAYERS.includes(name)) return;
-    // Only count genuinely submitted scores (non-null)
-    if (p.home_score === null || p.away_score === null) return;
+    // Only count genuinely submitted scores (non-null and non-undefined)
+    // Use == to catch both null and undefined
+    if (p.home_score == null || p.away_score == null) return;
     if (!subMap[p.gameweek]) subMap[p.gameweek] = {};
     subMap[p.gameweek][name] = (subMap[p.gameweek][name]||0) + 1;
   });
@@ -2095,11 +2099,11 @@ async function renderAdmin() {
               const key = p.match_key.replace(/^\d+_/, '');
               playerPreds[key] = {home: p.home_score, away: p.away_score};
             });
-            // Count only genuinely submitted (non-null) scores
-            const submittedCount = Object.values(playerPreds).filter(p => p.home !== null && p.away !== null).length;
+            // Count only genuinely submitted (non-null and non-undefined) scores
+            const submittedCount = Object.values(playerPreds).filter(p => p.home != null && p.away != null).length;
             const cells = matchKeys.map(key => {
               const pred = playerPreds[key];
-              const has = pred && pred.home !== null && pred.away !== null;
+              const has = pred && pred.home != null && pred.away != null;
               return '<td style="padding:0.45rem 0.5rem;text-align:center;border-bottom:1px solid rgba(31,46,31,0.3)">' +
                 (has ? '<span style="font-family:Bebas Neue,sans-serif;font-size:0.9rem">' + pred.home + '–' + pred.away + '</span>' : '<span style="color:rgba(106,125,106,0.4);font-size:0.7rem">–</span>') +
                 '</td>';
@@ -2361,7 +2365,8 @@ async function renderSeasonReview() {
       if (p.gameweek < 27) return;
       const r = resultMap[p.gameweek+'_'+p.match_key];
       if (!r) return;
-      const pts = calcPoints(p.home_score??0, p.away_score??0, r.home_score, r.away_score);
+      // Don't use ??0 - let calcPoints properly detect null/undefined predictions
+      const pts = calcPoints(p.home_score, p.away_score, r.home_score, r.away_score);
       if (pts===null) return;
       if (!gwPoints[name]) gwPoints[name]={};
       gwPoints[name][p.gameweek] = (gwPoints[name][p.gameweek]||0) + pts;
@@ -2661,7 +2666,8 @@ async function renderTracker() {
       if (!name || p.gameweek < 27) return;
       const r = resultMap[p.gameweek+'_'+p.match_key];
       if (!r) return;
-      const pts = calcPoints(p.home_score??0, p.away_score??0, r.home_score, r.away_score);
+      // Don't use ??0 - let calcPoints properly detect null/undefined predictions
+      const pts = calcPoints(p.home_score, p.away_score, r.home_score, r.away_score);
       if (pts===null) return;
       if (!gwPoints[name]) gwPoints[name] = {};
       gwPoints[name][p.gameweek] = (gwPoints[name][p.gameweek]||0) + pts;
