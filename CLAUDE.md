@@ -241,6 +241,10 @@ Brentford_Fulham (GW28 fixture) was written under GW27. Fix:
 ```sql
 DELETE FROM results WHERE gameweek = 27 AND match_key = 'Brentford_Fulham';
 ```
+GW navigation showing next button beyond current GW (fixed 23 April 2026)
+Symptom: When viewing GW29 (current GW), a "GW30 →" button was appearing on the right.
+Cause: The `gwNavButtons()` function was disabling the next button but still rendering it when `nextGW > currentGW`.
+Fix: Changed logic to conditionally render the next button only when viewing a past GW (`gw < currentGW`). When viewing the current GW, the next button is hidden entirely. The prev button always shows if GW > 1.
 ---
 Critical Code Rules
 Never use nested template literals — backticks inside `${}` inside backticks breaks the JS parser. Use string concatenation (`+`) for complex HTML in template literals.
