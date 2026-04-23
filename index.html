@@ -332,6 +332,12 @@ function isValidPlayer(name) {
   return PLAYERS.some(p => normalizePlayerName(p) === normalized);
 }
 
+// Get canonical player name from PLAYERS array (matching case)
+function getCanonicalPlayerName(name) {
+  const normalized = normalizePlayerName(name);
+  return PLAYERS.find(p => normalizePlayerName(p) === normalized) || name;
+}
+
 // Points and prize money are now fully derived from Supabase (GW1-38)
 
 const ABBREV_MAP = {
@@ -2000,8 +2006,10 @@ async function renderAdmin() {
     // Don't use ??0 - let calcPoints properly detect null/undefined predictions
     const pts = calcPoints(p.home_score, p.away_score, r.home_score, r.away_score);
     if (pts === null) return;
-    if (!gwPoints[name]) gwPoints[name] = {};
-    gwPoints[name][p.gameweek] = (gwPoints[name][p.gameweek]||0) + pts;
+    // Use canonical name from PLAYERS array to ensure case consistency
+    const canonicalName = getCanonicalPlayerName(name);
+    if (!gwPoints[canonicalName]) gwPoints[canonicalName] = {};
+    gwPoints[canonicalName][p.gameweek] = (gwPoints[canonicalName][p.gameweek]||0) + pts;
   });
 
   // Submission counts per GW
@@ -2013,7 +2021,9 @@ async function renderAdmin() {
     // Use == to catch both null and undefined
     if (p.home_score == null || p.away_score == null) return;
     if (!subMap[p.gameweek]) subMap[p.gameweek] = {};
-    subMap[p.gameweek][name] = (subMap[p.gameweek][name]||0) + 1;
+    // Use canonical name from PLAYERS array to ensure case consistency
+    const canonicalName = getCanonicalPlayerName(name);
+    subMap[p.gameweek][canonicalName] = (subMap[p.gameweek][canonicalName]||0) + 1;
   });
 
   const fixtureCount = currentMatches.length || 8;
