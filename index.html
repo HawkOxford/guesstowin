@@ -320,7 +320,17 @@ const SUPABASE_URL = 'https://iufbdwsmbwrtcqzkvyey.supabase.co';
 const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Iml1ZmJkd3NtYndydGNxemt2eWV5Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzQ2MTg2MzcsImV4cCI6MjA5MDE5NDYzN30.Q3B-7qr4xWcGpa1UJWKSAd1iu6_-WHaiDcPV4HJ8SNk';
 const sb = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 
-const PLAYERS = ['Jake','Glurk','Josh ⭐','Richard ⭐','Teflon','Alex','Gaz ⭐','Liam','Craig','Marcus'];
+const PLAYERS = ['Jake','Glurk','Josh','Richard','Teflon','Alex','Gaz','Liam','Craig','Marcus'];
+
+// Helper for case-insensitive player name matching
+function normalizePlayerName(name) {
+  return (name || '').toLowerCase().trim();
+}
+
+function isValidPlayer(name) {
+  const normalized = normalizePlayerName(name);
+  return PLAYERS.some(p => normalizePlayerName(p) === normalized);
+}
 
 // Points and prize money are now fully derived from Supabase (GW1-38)
 
@@ -506,7 +516,7 @@ async function renderLeaderboard() {
   const [{data: results},{data: allPreds},{data: allProfiles}] = await Promise.all([
     sb.from('results').select('gameweek,match_key,home_score,away_score,status').eq('status','finished').limit(5000),
     sb.from('predictions').select('user_id,gameweek,match_key,home_score,away_score').limit(10000),
-    sb.from('profiles').select('id,player_name')
+    sb.from('profiles').select('id,player_name,is_champion')
   ]);
   const profileMap={};
   (allProfiles||[]).forEach(p=>{ profileMap[p.id]=p.player_name; });
@@ -971,7 +981,7 @@ async function loadAllPredictions(gw) {
   if (!gw) return {};
   const [{data:preds,error:predErr},{data:profiles,error:profErr}] = await Promise.all([
     sb.from('predictions').select('user_id,match_key,home_score,away_score').eq('gameweek',gw).limit(500),
-    sb.from('profiles').select('id,player_name')
+    sb.from('profiles').select('id,player_name,is_champion')
   ]);
   if(predErr||profErr){console.error(predErr||profErr);return{};}
 
@@ -1345,7 +1355,7 @@ async function renderGWView(gw) {
   const [{data:results},{data:preds},{data:profiles}] = await Promise.all([
     sb.from('results').select('*').eq('gameweek', gw),
     sb.from('predictions').select('user_id,match_key,home_score,away_score').eq('gameweek',gw).limit(500),
-    sb.from('profiles').select('id,player_name')
+    sb.from('profiles').select('id,player_name,is_champion')
   ]);
 
   if (!results || !results.length) {
@@ -1938,13 +1948,17 @@ async function renderAdmin() {
     { data: preds },
     { data: results }
   ] = await Promise.all([
-    sb.from('profiles').select('id,player_name'),
+    sb.from('profiles').select('id,player_name,is_champion'),
     sb.from('predictions').select('user_id,gameweek,match_key,home_score,away_score').limit(10000),
     sb.from('results').select('gameweek,match_key,home_score,away_score,status').eq('status','finished').limit(5000)
   ]);
 
   const profileMap = {};
-  (profiles||[]).forEach(p => profileMap[p.id] = p.player_name);
+  const championMap = {};
+  (profiles||[]).forEach(p => {
+    profileMap[p.id] = p.player_name;
+    championMap[p.player_name] = p.is_champion || false;
+  });
 
   // Get all GWs (ensure we include 1-28 even if not all in Supabase yet)
   const allGWs = [...new Set([
@@ -1977,7 +1991,7 @@ async function renderAdmin() {
   // Add Supabase calculated points for GW27+
   (preds||[]).forEach(p => {
     const name = profileMap[p.user_id];
-    if (!name || !PLAYERS.includes(name)) return;
+    if (!name || !isValidPlayer(name)) return;
     // Only use Supabase calculated points for GW27+
     if (p.gameweek < 27) return;
     const key = p.match_key.replace(/^\d+_/, '');
@@ -1994,7 +2008,7 @@ async function renderAdmin() {
   const subMap = {};
   (preds||[]).forEach(p => {
     const name = profileMap[p.user_id];
-    if (!name || !PLAYERS.includes(name)) return;
+    if (!name || !isValidPlayer(name)) return;
     // Only count genuinely submitted scores (non-null and non-undefined)
     // Use == to catch both null and undefined
     if (p.home_score == null || p.away_score == null) return;
@@ -2033,8 +2047,10 @@ async function renderAdmin() {
         const count = subMap[currentGW]?.[name] || 0;
         const complete = count >= fixtureCount;
         const partial = count > 0 && !complete;
+        const isChampion = championMap[name] || false;
+        const displayName = isChampion ? name + ' ⭐' : name;
         return `<div style="display:flex;justify-content:space-between;align-items:center;padding:0.6rem 1rem;border-bottom:1px solid rgba(31,46,31,0.4)">
-          <span style="font-size:0.85rem;font-weight:500">${name}</span>
+          <span style="font-size:0.85rem;font-weight:500">${displayName}</span>
           <span style="font-size:0.65rem;font-weight:700;border-radius:3px;padding:2px 7px;${complete?'background:rgba(0,230,118,0.12);color:var(--green)':partial?'background:rgba(255,167,38,0.1);color:var(--amber)':'background:rgba(239,83,80,0.1);color:var(--red)'}">
             ${complete?'✓ '+count+'/'+fixtureCount:partial?'⚠ '+count+'/'+fixtureCount:'✗ None'}
           </span>
@@ -2108,7 +2124,9 @@ async function renderAdmin() {
                 (has ? '<span style="font-family:Bebas Neue,sans-serif;font-size:0.9rem">' + pred.home + '–' + pred.away + '</span>' : '<span style="color:rgba(106,125,106,0.4);font-size:0.7rem">–</span>') +
                 '</td>';
             }).join('');
-            return '<tr><td style="padding:0.45rem 1rem;font-weight:500;border-bottom:1px solid rgba(31,46,31,0.3);white-space:nowrap">' + name + ' <span style="font-size:0.65rem;color:var(--muted)">(' + submittedCount + '/' + matchKeys.length + ')</span></td>' + cells + '</tr>';
+            const isChampion = championMap[name] || false;
+            const displayName = isChampion ? name + ' ⭐' : name;
+            return '<tr><td style="padding:0.45rem 1rem;font-weight:500;border-bottom:1px solid rgba(31,46,31,0.3);white-space:nowrap">' + displayName + ' <span style="font-size:0.65rem;color:var(--muted)">(' + submittedCount + '/' + matchKeys.length + ')</span></td>' + cells + '</tr>';
           }).join('') +
           '</tbody></table>';
       })()}
@@ -2137,8 +2155,10 @@ async function renderAdmin() {
             return playerData.map((p, idx) => {
               const rankColor = idx === 0 ? 'var(--gold)' : idx === 1 ? 'var(--silver)' : idx === 2 ? 'var(--bronze)' : 'var(--text)';
               const rankEmoji = idx === 0 ? '🥇' : idx === 1 ? '🥈' : idx === 2 ? '🥉' : '';
+              const isChampion = championMap[p.name] || false;
+              const displayName = isChampion ? p.name + ' ⭐' : p.name;
               return `<tr style="background:${idx % 2 === 0 ? 'rgba(0,0,0,0.1)' : 'transparent'}">
-                <td style="padding:0.75rem 1rem;font-weight:600;border-bottom:1px solid rgba(31,46,31,0.2);color:${rankColor}">${rankEmoji} ${p.name} <span style="color:var(--green);font-family:'Bebas Neue',sans-serif;font-size:1rem">(${p.total})</span></td>
+                <td style="padding:0.75rem 1rem;font-weight:600;border-bottom:1px solid rgba(31,46,31,0.2);color:${rankColor}">${rankEmoji} ${displayName} <span style="color:var(--green);font-family:'Bebas Neue',sans-serif;font-size:1rem">(${p.total})</span></td>
                 ${allGWs.map(gw => {
                   const pts = p.gwPts[gw];
                   const cellColor = pts >= 9 ? 'var(--gold)' : pts >= 6 ? 'var(--green)' : pts ? 'var(--text)' : 'var(--muted)';
@@ -2339,7 +2359,7 @@ async function renderSeasonReview() {
   const [{ data: results }, { data: allPreds }, { data: allProfiles }] = await Promise.all([
     sb.from('results').select('gameweek,match_key,home_score,away_score,status').eq('status','finished').limit(5000),
     sb.from('predictions').select('user_id,gameweek,match_key,home_score,away_score').limit(10000),
-    sb.from('profiles').select('id,player_name')
+    sb.from('profiles').select('id,player_name,is_champion')
   ]);
 
   const profileMap = {};
@@ -2643,7 +2663,7 @@ async function renderTracker() {
   const [{data: results},{data: allPreds},{data: allProfiles}] = await Promise.all([
     sb.from('results').select('gameweek,match_key,home_score,away_score,status').eq('status','finished').limit(5000),
     sb.from('predictions').select('user_id,gameweek,match_key,home_score,away_score').limit(10000),
-    sb.from('profiles').select('id,player_name')
+    sb.from('profiles').select('id,player_name,is_champion')
   ]);
 
   const profileMap = {};
