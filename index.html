@@ -1939,7 +1939,7 @@ async function renderAdmin() {
     { data: results }
   ] = await Promise.all([
     sb.from('profiles').select('id,player_name'),
-    sb.from('predictions').select('user_id,gameweek,match_key,home_score,away_score').limit(10000),
+    sb.from('predictions').select('user_id,gameweek,match_key,home_score,away_score').gte('gameweek', Math.max(1, currentGW - 2)).limit(1000),
     sb.from('results').select('gameweek,match_key,home_score,away_score,status').eq('status','finished').limit(5000)
   ]);
 
