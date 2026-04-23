@@ -1241,13 +1241,12 @@ function buildLiveResults(liveMatches) {
 function gwNavButtons(gw) {
   const prevGW = gw - 1;
   const nextGW = gw + 1;
-  // Disable next button if it would go beyond the current GW
-  // Users can only navigate to GWs that have started (up to currentGW)
-  const nextDisabled = !currentGW || nextGW > currentGW;
-  console.log(`gwNavButtons: gw=${gw}, currentGW=${currentGW}, nextGW=${nextGW}, nextDisabled=${nextDisabled}`);
+  // Only show next button if viewing a past GW (gw < currentGW)
+  const showNextButton = currentGW && gw < currentGW;
+  console.log(`gwNavButtons: gw=${gw}, currentGW=${currentGW}, nextGW=${nextGW}, showNextButton=${showNextButton}`);
   return `
     <button class="gw-nav-btn" ${prevGW < 1 ? 'disabled' : ''} onclick="navigateGW(${prevGW})">← GW${prevGW}</button>
-    <button class="gw-nav-btn" ${nextDisabled ? 'disabled' : ''} onclick="navigateGW(${nextGW})">GW${nextGW} →</button>
+    ${showNextButton ? `<button class="gw-nav-btn" onclick="navigateGW(${nextGW})">GW${nextGW} →</button>` : '<div></div>'}
   `;
 }
 
