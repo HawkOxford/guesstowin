@@ -903,13 +903,14 @@ function formatMatchTime(utcDate) {
 async function estimateGWNumber(matches) {
   try {
     const { data: allResults } = await sb.from('results').select('gameweek,status').range(0, 4999);
+    if (!allResults || !allResults.length) return 1;
 
+    // Count total results rows per GW (all statuses) = fixture count for that GW
+    const totalCounts = {};
     // Count finished results per GW
     const finishedCounts = {};
-    // Count TOTAL results per GW (all statuses) - this is the expected fixture count
-    const totalCounts = {};
 
-    (allResults || []).forEach(r => {
+    allResults.forEach(r => {
       if (r.gameweek >= 1 && r.gameweek <= 38) {
         totalCounts[r.gameweek] = (totalCounts[r.gameweek] || 0) + 1;
         if (r.status === 'finished') {
@@ -918,23 +919,23 @@ async function estimateGWNumber(matches) {
       }
     });
 
-    // GW is complete when finished count >= total count for that GW (dynamic per GW)
+    // A GW is complete when finished >= total for that specific GW
     const completedGWs = Object.keys(totalCounts)
       .map(Number)
       .filter(gw => {
         const finished = finishedCounts[gw] || 0;
-        const total = totalCounts[gw] || 0;
+        const total = totalCounts[gw];
         return finished >= total && total > 0;
       })
       .sort((a, b) => b - a);
 
-    const maxCompleted = completedGWs.length > 0 ? completedGWs[0] : 0;
-    const detected = Math.min(maxCompleted + 1, 38);
+    if (!completedGWs.length) return 1;
 
-    return Math.max(1, detected);
+    const maxCompleted = completedGWs[0];
+    return Math.min(maxCompleted + 1, 38);
   } catch (err) {
     console.error('GW detection failed:', err);
-    return 29;
+    return 1;
   }
 }
 
