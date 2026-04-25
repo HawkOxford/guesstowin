@@ -928,7 +928,16 @@ async function estimateGWNumber(matches) {
     const allGWs = [...new Set([...Object.keys(finishedCounts), ...Object.keys(fixtureCounts)])].map(Number).sort((a,b) => a-b);
     const completedGWs = allGWs.filter(gw => {
       const finishedCount = finishedCounts[gw] ? finishedCounts[gw].size : 0;
-      const expectedCount = fixtureCounts[gw] ? fixtureCounts[gw].size : 10;
+      // Use matches.length if available, otherwise fixtureCounts from predictions table
+      // NO hardcoded fallback - if we don't know expected count, skip this GW
+      let expectedCount;
+      if (matches && matches.length > 0) {
+        expectedCount = matches.length;
+      } else if (fixtureCounts[gw]) {
+        expectedCount = fixtureCounts[gw].size;
+      } else {
+        return false; // Can't determine if complete without expected count
+      }
       // Only complete if we have finished all expected fixtures
       const isComplete = finishedCount >= expectedCount && finishedCount > 0;
       console.log(`GW${gw}: finished=${finishedCount}, expected=${expectedCount}, complete=${isComplete}`);
