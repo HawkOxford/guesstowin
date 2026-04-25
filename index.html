@@ -1026,7 +1026,11 @@ async function syncResultsToSupabase(gw, liveMatches) {
   }
 
   try {
-    await fetch(SUPABASE_PROXY + '?action=sync-results', {
+    const edgeFunctionUrl = SUPABASE_PROXY + '?action=sync-results';
+    console.log('SYNC DEBUG 6 - Edge Function URL:', edgeFunctionUrl);
+    console.log('SYNC DEBUG 7 - Rows to write:', JSON.stringify(rows));
+
+    const response = await fetch(edgeFunctionUrl, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -1034,7 +1038,14 @@ async function syncResultsToSupabase(gw, liveMatches) {
       },
       body: JSON.stringify({ rows })
     });
-  } catch(e) { console.warn('sync failed:', e.message); }
+
+    console.log('SYNC DEBUG 8 - Edge Function response status:', response.status);
+    const responseText = await response.text();
+    console.log('SYNC DEBUG 9 - Edge Function response:', responseText);
+  } catch(e) {
+    console.warn('sync failed:', e.message);
+    console.error('SYNC DEBUG 10 - ERROR:', e);
+  }
 }
 
 // ── Main render ───────────────────────────────────────────────────────────────
@@ -2198,6 +2209,9 @@ setTimeout(syncLiveResults, 5000); // 5s after load to let auth settle
 // Independent sync — runs every 60s regardless of deadline state
 // Fetches live matches and writes any FINISHED results to Supabase
 async function syncLiveResults() {
+  console.log('SYNC DEBUG 1 - starting sync, currentGW:', currentGW);
+  console.log('SYNC DEBUG 1 - currentMatches:', JSON.stringify(currentMatches?.map(m => m.homeTeam?.name + ' vs ' + m.awayTeam?.name)));
+
   if (!currentUser || !currentGW) return;
   // Only fetch live data during the live window (first kickoff to last kickoff + 2hrs)
   // or if deadlinePassed is already true
@@ -2222,6 +2236,10 @@ async function syncLiveResults() {
     const day = ukWeekday(m.utcDate);
     return day === 'Saturday' || day === 'Sunday';
   }) || [];
+
+  console.log('SYNC DEBUG 2 - API response matches:', matches?.length);
+  console.log('SYNC DEBUG 2 - finished matches:', matches?.filter(m => m.status === 'FINISHED' || m.status === 'IN_PLAY').map(m => m.homeTeam.name + ' ' + m.score?.fullTime?.home + '-' + m.score?.fullTime?.away + ' ' + m.awayTeam.name + ' status:' + m.status));
+
   if (!matches.length) return;
 
   // Only write results for THIS WEEKEND's matches — filter to currentMatches dates only
@@ -2232,6 +2250,15 @@ async function syncLiveResults() {
     const key = cleanTeamName(m.homeTeam?.name) + '_' + cleanTeamName(m.awayTeam?.name);
     return m.status === 'FINISHED' && currentMatchKeys.has(key);
   });
+
+  console.log('SYNC DEBUG 3 - matches after filtering to currentMatches keys:', thisWeekendFinished?.length);
+  console.log('SYNC DEBUG 4 - about to write to Supabase, matches:', JSON.stringify(thisWeekendFinished.map(m => ({
+    home: m.homeTeam?.name,
+    away: m.awayTeam?.name,
+    score: m.score?.fullTime?.home + '-' + m.score?.fullTime?.away,
+    status: m.status
+  }))));
+
   if (thisWeekendFinished.length) {
     await syncResultsToSupabase(currentGW, thisWeekendFinished);
   }
