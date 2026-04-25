@@ -502,10 +502,12 @@ function calcPoints(predH, predA, actH, actA) {
 async function renderLeaderboard() {
   const section = document.getElementById('leaderboard-section');
 
-  // Load profiles and stored points from database
-  const [{data: allProfiles}, {data: storedPoints}] = await Promise.all([
+  // Load profiles, stored points, and current GW predictions for live scoring
+  const [{data: allProfiles}, {data: storedPoints}, {data: allPreds}] = await Promise.all([
     sb.from('profiles').select('id,player_name'),
-    sb.from('user_gameweek_points').select('user_id,gameweek,points').gte('gameweek', 1)
+    sb.from('user_gameweek_points').select('user_id,gameweek,points').gte('gameweek', 1),
+    // Need current GW predictions for live scoring overlay
+    currentGW ? sb.from('predictions').select('user_id,gameweek,match_key,home_score,away_score').eq('gameweek', currentGW) : Promise.resolve({data: []})
   ]);
 
   const profileMap = {};
