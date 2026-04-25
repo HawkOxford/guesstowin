@@ -530,19 +530,41 @@ async function renderLeaderboard() {
     const resultMap = {};
     results.forEach(r => { resultMap[`${r.gameweek}_${r.match_key}`] = r; });
 
+    // DEBUG: Track problem users
+    const problemUsers = ['Glurk', 'Richard', 'Teflon', 'Gaz', 'Craig'];
+    const gw29Debug = {};
+
     allPreds.forEach(p => {
       const dbName = profileMap[p.user_id];
       if(!dbName) return;
       // Strip star to normalize name (DB might have "Josh", PLAYERS has "Josh ⭐")
       const name = dbName.replace(/\s*⭐\s*/g, '');
 
+      // DEBUG: Track GW29 predictions for problem users
+      if (p.gameweek === 29 && problemUsers.includes(name)) {
+        if (!gw29Debug[name]) gw29Debug[name] = { predictions: 0, matched: 0, unmatched: [] };
+        gw29Debug[name].predictions++;
+      }
+
       // Try database results first, then fall back to liveResults (like "all predictions" table does)
       let r = resultMap[`${p.gameweek}_${p.match_key}`];
+      let source = 'db';
       if (!r) {
         // Check liveResults using match_key without gameweek prefix
         const cleanKey = p.match_key.replace(/^\d+_/, '');
         r = liveResults[cleanKey];
+        source = 'live';
       }
+
+      // DEBUG: Track matches/mismatches
+      if (p.gameweek === 29 && problemUsers.includes(name)) {
+        if (r) {
+          gw29Debug[name].matched++;
+        } else {
+          gw29Debug[name].unmatched.push(p.match_key);
+        }
+      }
+
       if(!r) return;
 
       // Only use Supabase calculated points for GW27+
@@ -552,6 +574,19 @@ async function renderLeaderboard() {
       if(pts===null) return;
       if(!gwPoints[name]) gwPoints[name]={};
       gwPoints[name][p.gameweek] = (gwPoints[name][p.gameweek]||0) + pts;
+    });
+
+    // DEBUG: Log GW29 matching results
+    console.log('=== GW29 DEBUG ===');
+    problemUsers.forEach(name => {
+      if (gw29Debug[name]) {
+        console.log(`${name}: ${gw29Debug[name].predictions} predictions, ${gw29Debug[name].matched} matched, ${gw29Debug[name].unmatched.length} unmatched`);
+        if (gw29Debug[name].unmatched.length > 0) {
+          console.log(`  Unmatched keys:`, gw29Debug[name].unmatched);
+        }
+      } else {
+        console.log(`${name}: NO GW29 predictions found in database`);
+      }
     });
 
     const gws = [...new Set(results.map(r=>r.gameweek))];
