@@ -657,6 +657,9 @@ async function renderLeaderboard() {
     return { name, total, baseTotal, liveGWPts, weekly: extraPrize };
   }).sort((a,b)=>b.total-a.total);
 
+  // DEBUG: Check totals array
+  console.log('totals array:', totals);
+
   // Assign ranks
   let rank=1;
   for(let i=0;i<totals.length;i++){
