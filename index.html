@@ -901,10 +901,18 @@ function formatMatchTime(utcDate) {
 }
 
 async function estimateGWNumber(matches) {
+  console.log('🔍 [GW DETECT] Starting GW detection...');
   try {
+    console.log('🔍 [GW DETECT] Fetching results from database...');
     const { data: resultRows } = await sb.from('results').select('gameweek,status').limit(5000);
+    console.log('🔍 [GW DETECT] Fetched', resultRows?.length || 0, 'result rows');
+
     const validRows = (resultRows || []).filter(r => r.gameweek >= 1 && r.gameweek <= 38);
-    if (!validRows.length) return 1;
+    console.log('🔍 [GW DETECT] Valid rows (GW 1-38):', validRows.length);
+    if (!validRows.length) {
+      console.log('🔍 [GW DETECT] No valid rows, returning GW 1');
+      return 1;
+    }
 
     // Count finished results per GW
     const finishedCounts = {};
@@ -913,12 +921,14 @@ async function estimateGWNumber(matches) {
         finishedCounts[r.gameweek] = (finishedCounts[r.gameweek] || 0) + 1;
       }
     });
+    console.log('🔍 [GW DETECT] Finished counts:', finishedCounts);
 
     // Count TOTAL results (all statuses) per GW to get expected fixture count
     const totalFixtureCounts = {};
     validRows.forEach(r => {
       totalFixtureCounts[r.gameweek] = (totalFixtureCounts[r.gameweek] || 0) + 1;
     });
+    console.log('🔍 [GW DETECT] Total fixture counts:', totalFixtureCounts);
 
     // A GW is complete when finished count equals total fixture count for that GW
     const completedGWs = Object.keys(finishedCounts)
@@ -926,40 +936,51 @@ async function estimateGWNumber(matches) {
       .filter(gw => {
         const finished = finishedCounts[gw] || 0;
         const total = totalFixtureCounts[gw] || 0;
-        return finished >= total && finished > 0;
+        const isComplete = finished >= total && finished > 0;
+        console.log(`🔍 [GW DETECT] GW${gw}: ${finished}/${total} finished - Complete: ${isComplete}`);
+        return isComplete;
       })
       .sort((a, b) => b - a);
 
-    if (!completedGWs.length) return 1;
+    console.log('🔍 [GW DETECT] Completed GWs:', completedGWs);
+
+    if (!completedGWs.length) {
+      console.log('🔍 [GW DETECT] No completed GWs, returning GW 1');
+      return 1;
+    }
+
     const maxCompleted = completedGWs[0];
-    console.log(`Max completed GW: ${maxCompleted}`);
-    console.log(`Per-GW finished vs total:`, Object.keys(totalFixtureCounts).map(Number).sort((a,b) => a-b).map(gw =>
-      `GW${gw}: ${finishedCounts[gw] || 0}/${totalFixtureCounts[gw]}`
-    ).join(', '));
+    console.log('🔍 [GW DETECT] Max completed GW:', maxCompleted);
 
     // Get UK time including hours and minutes
     const ukTime = new Date().toLocaleString('en-GB', {timeZone:'Europe/London', hour12:false});
     const ukDay = new Date().toLocaleDateString('en-GB', {timeZone:'Europe/London', weekday:'long'});
     const [datePart, timePart] = ukTime.split(', ');
     const [hours, minutes] = timePart.split(':').map(Number);
-    console.log(`UK Time: ${ukDay} ${timePart} (hours=${hours}, minutes=${minutes})`);
+    console.log(`🔍 [GW DETECT] UK Time: ${ukDay} ${timePart} (hours=${hours}, minutes=${minutes})`);
 
     // Stay on current (completed) GW if:
     // - It's Saturday or Sunday
     // - It's Monday but before 00:01
     if (ukDay === 'Saturday' || ukDay === 'Sunday') {
-      console.log(`Weekend detected - staying on GW${maxCompleted}`);
+      console.log(`🔍 [GW DETECT] Weekend detected - staying on GW${maxCompleted}`);
+      console.log(`🔍 [GW DETECT] ✅ RETURNING GW ${maxCompleted}`);
       return Math.min(maxCompleted, 38);
     }
     if (ukDay === 'Monday' && (hours === 0 && minutes === 0)) {
-      console.log(`Monday 00:00 detected - staying on GW${maxCompleted}`);
+      console.log(`🔍 [GW DETECT] Monday 00:00 detected - staying on GW${maxCompleted}`);
+      console.log(`🔍 [GW DETECT] ✅ RETURNING GW ${maxCompleted}`);
       return Math.min(maxCompleted, 38);
     }
 
     // Otherwise advance to next GW
-    console.log(`Advancing to GW${maxCompleted + 1}`);
-    return Math.min(maxCompleted + 1, 38);
+    const nextGW = Math.min(maxCompleted + 1, 38);
+    console.log(`🔍 [GW DETECT] Weekday detected - advancing to next GW`);
+    console.log(`🔍 [GW DETECT] ✅ RETURNING GW ${nextGW}`);
+    return nextGW;
   } catch(e) {
+    console.error('🔍 [GW DETECT] ❌ ERROR:', e);
+    console.log('🔍 [GW DETECT] ✅ RETURNING GW 1 (fallback)');
     return 1;
   }
 }
