@@ -521,10 +521,12 @@ async function renderLeaderboard() {
 
   // Seed gwPoints with hardcoded GW1-26 data first
   PLAYERS.forEach(name => {
+    // Strip star to normalize key (all gwPoints should use same key format)
+    const nameKey = name.replace(/\s*⭐\s*/g, '');
     const hist = HISTORICAL_GW_POINTS[name] || {};
     Object.entries(hist).forEach(([gw, pts]) => {
-      if (!gwPoints[name]) gwPoints[name] = {};
-      gwPoints[name][parseInt(gw)] = pts;
+      if (!gwPoints[nameKey]) gwPoints[nameKey] = {};
+      gwPoints[nameKey][parseInt(gw)] = pts;
     });
   });
 
