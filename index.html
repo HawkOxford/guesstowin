@@ -631,6 +631,13 @@ async function renderLeaderboard() {
     prevRank++;
   }
 
+  // DEBUG: Check gwPoints for champion players
+  console.log('gwPoints keys:', Object.keys(gwPoints));
+  ['Josh', 'Richard', 'Gaz'].forEach(name => {
+    console.log(`${name} gwPoints:`, gwPoints[name]);
+    console.log(`${name} total:`, Object.values(gwPoints[name]||{}).reduce((a,b)=>a+b,0));
+  });
+
   // Calculate totals AFTER live overlay is applied
   const totals = PLAYERS.map(name => {
     // Strip star to normalize lookup (gwPoints uses names without stars)
