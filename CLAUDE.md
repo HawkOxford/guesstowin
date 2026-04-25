@@ -411,6 +411,69 @@ currentMatches.forEach(m => {
 
 **Committed:** 94bf5c4
 
+**UPDATE:** Initial fix was incomplete. Found duplicate gwPoints keys:
+- Historical points stored at `gwPoints["Josh ⭐"]` (with star)
+- Supabase points stored at `gwPoints["Josh"]` (without star)
+- Display looked up `gwPoints["Josh"]` → only found GW27+ points, missing historical
+
+**Final fix:** Also normalize historical points seeding (line 522):
+```javascript
+PLAYERS.forEach(name => {
+  const nameKey = name.replace(/\s*⭐\s*/g, '');
+  const hist = HISTORICAL_GW_POINTS[name] || {};
+  Object.entries(hist).forEach(([gw, pts]) => {
+    gwPoints[nameKey][parseInt(gw)] = pts; // Use normalized key
+  });
+});
+```
+
+**Result:** All gwPoints now use consistent normalized keys (stars stripped)
+
+**Committed:** 0934f29 (fix), b79bf1e (cleanup)
+
+---
+
+### Edge Function Payload Mismatch — Sync Failing with "No results provided" ✅
+
+**Date:** 25 April 2026
+
+**Problem:** Live results sync was failing with Edge Function error: `{"success":false,"error":"No results provided"}`. GW29 results were not being written to database, causing points calculation to fail.
+
+**Root cause:** Client-server payload mismatch:
+- Client (index.html line 1062) was sending: `{ rows: [...] }`
+- Edge Function (football-proxy/index.ts line 30) expected: `{ results: [...] }`
+- Mismatched property name caused Edge Function to reject the request
+
+**Fix:**
+- Changed line 1062 from `body: JSON.stringify({ rows })` to `body: JSON.stringify({ results: rows })`
+
+**Result:**
+- ✅ Sync now working correctly
+- ✅ Console shows: `{"success":true,"count":1}`
+- ✅ GW29 results successfully written to database
+
+**Committed:** 4be7492
+
+---
+
+### "This GW" Column Removed from Leaderboard
+
+**Date:** 25 April 2026
+
+**Reason:** Temporarily removed while investigating scoring issues. The column was showing 0 points for 6 players (Glurk, Josh, Richard, Teflon, Gaz, Craig) on GW29, which turned out to be accurate (they legitimately scored 0 points), but caused confusion during debugging.
+
+**Change:**
+- Removed the live GW points column from leaderboard (line 719)
+- Removed all SYNC DEBUG and gwPoints DEBUG console logs (production cleanup)
+- Kept sync error logging for failures only
+
+**Files modified:**
+- `index.html` — Removed "This GW" column and debug logging
+
+**Committed:** 23e4833
+
+**Note:** The "This GW" column can be re-added later if desired. The underlying live points calculation is working correctly.
+
 ---
 
 Pending Code Improvements (low priority — do in quiet week)
