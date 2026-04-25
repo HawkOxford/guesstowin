@@ -542,6 +542,30 @@ When GW29 had 5 fixtures but only Fulham v AVL finished, only 1 row was written.
 
 **Deployed:** c2bb624 (debug cleanup)
 
+**TODO - Improve GW detection logic (implement after GW29 finishes):**
+
+Current logic (functional but flawed):
+- Counts results rows in database per GW
+- GW complete when: finished count >= total count in database
+- Problem: Relies on database being correct, no validation against actual fixture count
+
+Correct logic to implement:
+1. **Fixture count from API = source of truth**
+   - Query API for GW's fixture list (weekend matches only)
+   - Count how many fixtures the GW should have (e.g., GW29 has 5)
+2. **GW complete when: API fixture count == finished results count**
+   - Check database: how many results have status='finished' for this GW
+   - When finished == API count → GW complete
+3. **Monday 00:01 UK time → advance to next GW**
+   - Even if previous GW incomplete, new GW goes live Monday morning
+   - Prevents stuck states if a match is postponed/abandoned
+
+Benefits:
+- API is source of truth (more robust)
+- Validates database against reality
+- Handles edge cases (postponed matches, database errors)
+- Time-based fallback prevents infinite loops
+
 ---
 
 Pending Code Improvements (low priority — do in quiet week)
