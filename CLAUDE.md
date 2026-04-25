@@ -364,6 +364,55 @@ currentMatches.forEach(m => {
 
 ---
 
+### Name Normalization Bug — Half Players Showing 0pts for "This GW" ✅
+
+**Problem:** Craig, Josh, Gaz, Teflon, Richard, Glurk all showed 0 points for "This GW" (GW29) while other players showed correct scores.
+
+**Root cause:** Name mismatch between database `player_name` and PLAYERS array names:
+- Database stores names without stars: "Josh", "Richard", "Gaz"
+- PLAYERS array has names WITH stars: "Josh ⭐", "Richard ⭐", "Gaz ⭐"
+- Base Supabase calculation (lines 531-545) stored points using database names: `gwPoints["Josh"][29] = 12`
+- Display code (line 626+) looked up using PLAYERS array names: `gwPoints["Josh ⭐"][29]` → undefined → 0pts
+
+**Why half the players:**
+- Not all players had the exact name mismatch
+- Some had other naming inconsistencies (whitespace, case, etc.)
+- All affected players: Craig, Josh, Gaz, Teflon, Richard, Glurk
+
+**Fix applied across 7 locations:**
+
+1. **Base Supabase calculation (lines 533-534):**
+   ```javascript
+   const dbName = profileMap[p.user_id];
+   const name = dbName.replace(/\s*⭐\s*/g, ''); // Strip stars
+   gwPoints[name][p.gameweek] = points;
+   ```
+
+2. **Live overlay storage (lines 600-604):**
+   ```javascript
+   const nameWithoutStar = name.replace(/\s*⭐\s*/g, '');
+   gwPoints[nameWithoutStar][currentGW] = livePts;
+   ```
+
+3. **gwWinners calculation (lines 549-552)**
+4. **liveScores calculation (lines 608-611)**
+5. **gwScores/GW leader calculation (lines 665-670)**
+6. **baseTotals calculation (lines 614-620)**
+7. **totals/display calculation (lines 628-641)**
+
+**Files modified:**
+- `index.html` — All gwPoints operations now use normalized names (stars stripped)
+
+**Result:**
+- ✅ All players now show correct "This GW" points
+- ✅ Season totals now update correctly with live GW points
+- ✅ GW winner badges display correctly
+- ✅ Rank arrows work correctly (based on baseTotals)
+
+**Committed:** 94bf5c4
+
+---
+
 Pending Code Improvements (low priority — do in quiet week)
 Safe to do anytime
 Remove `renderLeaderboardGuest` one-liner (just calls `renderLeaderboard` directly)
