@@ -511,10 +511,6 @@ async function renderLeaderboard() {
   const profileMap={};
   (allProfiles||[]).forEach(p=>{ profileMap[p.id]=p.player_name; });
 
-  // DEBUG: Log database player names vs PLAYERS array
-  console.log('[Leaderboard] Database player names:', Object.values(profileMap));
-  console.log('[Leaderboard] PLAYERS array:', PLAYERS);
-
   // Build points per player per GW from Supabase results
   const gwPoints = {};
   const gwWinners = {};
@@ -634,12 +630,6 @@ async function renderLeaderboard() {
     else prevRankMap[baseTotals[i].name]=prevRank;
     prevRank++;
   }
-
-  // DEBUG: Log gwPoints structure before calculating totals
-  console.log('[Leaderboard] gwPoints keys:', Object.keys(gwPoints));
-  console.log('[Leaderboard] gwPoints for GW', currentGW, ':',
-    Object.fromEntries(Object.entries(gwPoints).map(([name, gws]) => [name, gws[currentGW] || 0]))
-  );
 
   // Calculate totals AFTER live overlay is applied
   const totals = PLAYERS.map(name => {
