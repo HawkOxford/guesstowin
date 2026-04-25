@@ -631,16 +631,6 @@ async function renderLeaderboard() {
     prevRank++;
   }
 
-  // DEBUG: Detailed gwPoints inspection
-  console.log('=== GWPOINTS DEBUG ===');
-  console.log('gwPoints keys:', Object.keys(gwPoints));
-  console.log('PLAYERS array:', PLAYERS);
-  PLAYERS.forEach(name => {
-    const nameKey = name.replace(/\s*⭐\s*/g, '');
-    console.log(`${name} (key: ${nameKey}):`, gwPoints[nameKey]);
-  });
-  console.log('=====================');
-
   // Calculate totals AFTER live overlay is applied
   const totals = PLAYERS.map(name => {
     // Strip star to normalize lookup (gwPoints uses names without stars)
@@ -716,7 +706,6 @@ async function renderLeaderboard() {
             ${tied?'<span class="tied-badge">TIE</span>':''}
             ${isMe?'<span class="you-badge">YOU</span>':''}
           </div>
-          <div style="text-align:center">${showLive ? '<div style="font-family:Bebas Neue,sans-serif;font-size:1.2rem;color:var(--green)">+' + liveGWPts + '</div><div style="font-size:0.6rem;color:var(--muted);letter-spacing:0.05em">THIS GW</div>' : ''}</div>
           <div class="lb-pts-col">
             <div class="lb-points">${p.total}</div>
             <div class="lb-gw">£${p.weekly.toFixed(2)} won</div>
@@ -1060,8 +1049,6 @@ async function syncResultsToSupabase(gw, liveMatches) {
 
   try {
     const edgeFunctionUrl = SUPABASE_PROXY + '?action=sync-results';
-    console.log('SYNC DEBUG 6 - Edge Function URL:', edgeFunctionUrl);
-    console.log('SYNC DEBUG 7 - Rows to write:', JSON.stringify(rows));
 
     const response = await fetch(edgeFunctionUrl, {
       method: 'POST',
@@ -1072,12 +1059,12 @@ async function syncResultsToSupabase(gw, liveMatches) {
       body: JSON.stringify({ results: rows })
     });
 
-    console.log('SYNC DEBUG 8 - Edge Function response status:', response.status);
-    const responseText = await response.text();
-    console.log('SYNC DEBUG 9 - Edge Function response:', responseText);
+    if (!response.ok) {
+      const responseText = await response.text();
+      console.warn('Sync failed:', response.status, responseText);
+    }
   } catch(e) {
     console.warn('sync failed:', e.message);
-    console.error('SYNC DEBUG 10 - ERROR:', e);
   }
 }
 
@@ -2242,9 +2229,6 @@ setTimeout(syncLiveResults, 5000); // 5s after load to let auth settle
 // Independent sync — runs every 60s regardless of deadline state
 // Fetches live matches and writes any FINISHED results to Supabase
 async function syncLiveResults() {
-  console.log('SYNC DEBUG 1 - starting sync, currentGW:', currentGW);
-  console.log('SYNC DEBUG 1 - currentMatches:', JSON.stringify(currentMatches?.map(m => m.homeTeam?.name + ' vs ' + m.awayTeam?.name)));
-
   if (!currentUser || !currentGW) return;
   // Only fetch live data during the live window (first kickoff to last kickoff + 2hrs)
   // or if deadlinePassed is already true
@@ -2270,9 +2254,6 @@ async function syncLiveResults() {
     return day === 'Saturday' || day === 'Sunday';
   }) || [];
 
-  console.log('SYNC DEBUG 2 - API response matches:', matches?.length);
-  console.log('SYNC DEBUG 2 - finished matches:', matches?.filter(m => m.status === 'FINISHED' || m.status === 'IN_PLAY').map(m => m.homeTeam.name + ' ' + m.score?.fullTime?.home + '-' + m.score?.fullTime?.away + ' ' + m.awayTeam.name + ' status:' + m.status));
-
   if (!matches.length) return;
 
   // Only write results for THIS WEEKEND's matches — filter to currentMatches dates only
@@ -2283,14 +2264,6 @@ async function syncLiveResults() {
     const key = cleanTeamName(m.homeTeam?.name) + '_' + cleanTeamName(m.awayTeam?.name);
     return m.status === 'FINISHED' && currentMatchKeys.has(key);
   });
-
-  console.log('SYNC DEBUG 3 - matches after filtering to currentMatches keys:', thisWeekendFinished?.length);
-  console.log('SYNC DEBUG 4 - about to write to Supabase, matches:', JSON.stringify(thisWeekendFinished.map(m => ({
-    home: m.homeTeam?.name,
-    away: m.awayTeam?.name,
-    score: m.score?.fullTime?.home + '-' + m.score?.fullTime?.away,
-    status: m.status
-  }))));
 
   if (thisWeekendFinished.length) {
     await syncResultsToSupabase(currentGW, thisWeekendFinished);
