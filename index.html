@@ -902,9 +902,11 @@ function formatMatchTime(utcDate) {
 
 async function estimateGWNumber(matches) {
   console.log('🔍 [GW DETECT] Starting GW detection...');
+  alert('GW DETECTION STARTED'); // Debug alert
   try {
     console.log('🔍 [GW DETECT] Fetching results from database...');
     const { data: resultRows } = await sb.from('results').select('gameweek,status').limit(5000);
+    alert(`Fetched ${resultRows?.length || 0} result rows`); // Debug alert
     console.log('🔍 [GW DETECT] Fetched', resultRows?.length || 0, 'result rows');
 
     const validRows = (resultRows || []).filter(r => r.gameweek >= 1 && r.gameweek <= 38);
@@ -1085,10 +1087,18 @@ async function syncResultsToSupabase(gw, liveMatches) {
 
 // ── Main render ───────────────────────────────────────────────────────────────
 async function fetchAndRenderFixtures(targetGW) {
+  console.log('🚀 [MAIN] fetchAndRenderFixtures called with targetGW:', targetGW);
   const section = document.getElementById('fixtures-section');
 
   // Set currentGW first from Supabase
-  if (!currentGW) currentGW = await estimateGWNumber([]);
+  console.log('🚀 [MAIN] currentGW before estimate:', currentGW);
+  if (!currentGW) {
+    console.log('🚀 [MAIN] Calling estimateGWNumber...');
+    currentGW = await estimateGWNumber([]);
+    console.log('🚀 [MAIN] estimateGWNumber returned:', currentGW);
+  } else {
+    console.log('🚀 [MAIN] Skipping estimateGWNumber (currentGW already set)');
+  }
 
   // Clear stale cache entries older than the TTL to force fresh fixture data
   const now_ts = Date.now();
