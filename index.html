@@ -1059,7 +1059,7 @@ async function syncResultsToSupabase(gw, liveMatches) {
         'Content-Type': 'application/json',
         'Authorization': 'Bearer ' + SUPABASE_KEY
       },
-      body: JSON.stringify({ rows })
+      body: JSON.stringify({ results: rows })
     });
 
     console.log('SYNC DEBUG 8 - Edge Function response status:', response.status);
