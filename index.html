@@ -535,8 +535,16 @@ async function renderLeaderboard() {
       if(!dbName) return;
       // Strip star to normalize name (DB might have "Josh", PLAYERS has "Josh ⭐")
       const name = dbName.replace(/\s*⭐\s*/g, '');
-      const r = resultMap[`${p.gameweek}_${p.match_key}`];
+
+      // Try database results first, then fall back to liveResults (like "all predictions" table does)
+      let r = resultMap[`${p.gameweek}_${p.match_key}`];
+      if (!r) {
+        // Check liveResults using match_key without gameweek prefix
+        const cleanKey = p.match_key.replace(/^\d+_/, '');
+        r = liveResults[cleanKey];
+      }
       if(!r) return;
+
       // Only use Supabase calculated points for GW27+
       if(p.gameweek < 27) return;
       // Don't use ??0 - let calcPoints properly detect null/undefined predictions
