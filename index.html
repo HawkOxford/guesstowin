@@ -901,89 +901,28 @@ function formatMatchTime(utcDate) {
 }
 
 async function estimateGWNumber(matches) {
-  console.log('🔍 [GW DETECT] Starting GW detection...');
-  alert('GW DETECTION STARTED'); // Debug alert
   try {
-    console.log('🔍 [GW DETECT] Fetching results from database...');
-    const { data: resultRows } = await sb.from('results').select('gameweek,status').limit(5000);
-    alert(`Fetched ${resultRows?.length || 0} result rows`); // Debug alert
-    console.log('🔍 [GW DETECT] Fetched', resultRows?.length || 0, 'result rows');
+    const { data: allResults } = await sb.from('results').select('gameweek,status').range(0, 4999);
 
-    const validRows = (resultRows || []).filter(r => r.gameweek >= 1 && r.gameweek <= 38);
-    console.log('🔍 [GW DETECT] Valid rows (GW 1-38):', validRows.length);
-    if (!validRows.length) {
-      console.log('🔍 [GW DETECT] No valid rows, returning GW 1');
-      return 1;
-    }
-
-    // Count finished results per GW
     const finishedCounts = {};
-    validRows.forEach(r => {
+    (allResults || []).forEach(r => {
       if (r.status === 'finished') {
         finishedCounts[r.gameweek] = (finishedCounts[r.gameweek] || 0) + 1;
       }
     });
-    console.log('🔍 [GW DETECT] Finished counts:', finishedCounts);
 
-    // Count TOTAL results (all statuses) per GW to get expected fixture count
-    const totalFixtureCounts = {};
-    validRows.forEach(r => {
-      totalFixtureCounts[r.gameweek] = (totalFixtureCounts[r.gameweek] || 0) + 1;
-    });
-    console.log('🔍 [GW DETECT] Total fixture counts:', totalFixtureCounts);
-
-    // A GW is complete when finished count equals total fixture count for that GW
     const completedGWs = Object.keys(finishedCounts)
       .map(Number)
-      .filter(gw => {
-        const finished = finishedCounts[gw] || 0;
-        const total = totalFixtureCounts[gw] || 0;
-        const isComplete = finished >= total && finished > 0;
-        console.log(`🔍 [GW DETECT] GW${gw}: ${finished}/${total} finished - Complete: ${isComplete}`);
-        return isComplete;
-      })
+      .filter(gw => finishedCounts[gw] >= 9)
       .sort((a, b) => b - a);
 
-    console.log('🔍 [GW DETECT] Completed GWs:', completedGWs);
+    const maxCompleted = completedGWs.length > 0 ? completedGWs[0] : 0;
+    const detected = Math.min(maxCompleted + 1, 38);
 
-    if (!completedGWs.length) {
-      console.log('🔍 [GW DETECT] No completed GWs, returning GW 1');
-      return 1;
-    }
-
-    const maxCompleted = completedGWs[0];
-    console.log('🔍 [GW DETECT] Max completed GW:', maxCompleted);
-
-    // Get UK time including hours and minutes
-    const ukTime = new Date().toLocaleString('en-GB', {timeZone:'Europe/London', hour12:false});
-    const ukDay = new Date().toLocaleDateString('en-GB', {timeZone:'Europe/London', weekday:'long'});
-    const [datePart, timePart] = ukTime.split(', ');
-    const [hours, minutes] = timePart.split(':').map(Number);
-    console.log(`🔍 [GW DETECT] UK Time: ${ukDay} ${timePart} (hours=${hours}, minutes=${minutes})`);
-
-    // Stay on current (completed) GW if:
-    // - It's Saturday or Sunday
-    // - It's Monday but before 00:01
-    if (ukDay === 'Saturday' || ukDay === 'Sunday') {
-      console.log(`🔍 [GW DETECT] Weekend detected - staying on GW${maxCompleted}`);
-      console.log(`🔍 [GW DETECT] ✅ RETURNING GW ${maxCompleted}`);
-      return Math.min(maxCompleted, 38);
-    }
-    if (ukDay === 'Monday' && (hours === 0 && minutes === 0)) {
-      console.log(`🔍 [GW DETECT] Monday 00:00 detected - staying on GW${maxCompleted}`);
-      console.log(`🔍 [GW DETECT] ✅ RETURNING GW ${maxCompleted}`);
-      return Math.min(maxCompleted, 38);
-    }
-
-    // Otherwise advance to next GW
-    const nextGW = Math.min(maxCompleted + 1, 38);
-    console.log(`🔍 [GW DETECT] Weekday detected - advancing to next GW`);
-    console.log(`🔍 [GW DETECT] ✅ RETURNING GW ${nextGW}`);
-    return nextGW;
-  } catch(e) {
-    console.error('🔍 [GW DETECT] ❌ ERROR:', e);
-    console.log('🔍 [GW DETECT] ✅ RETURNING GW 1 (fallback)');
-    return 1;
+    return Math.max(1, detected);
+  } catch (err) {
+    console.error('GW detection failed:', err);
+    return 29;
   }
 }
 
@@ -1087,18 +1026,10 @@ async function syncResultsToSupabase(gw, liveMatches) {
 
 // ── Main render ───────────────────────────────────────────────────────────────
 async function fetchAndRenderFixtures(targetGW) {
-  console.log('🚀 [MAIN] fetchAndRenderFixtures called with targetGW:', targetGW);
   const section = document.getElementById('fixtures-section');
 
   // Set currentGW first from Supabase
-  console.log('🚀 [MAIN] currentGW before estimate:', currentGW);
-  if (!currentGW) {
-    console.log('🚀 [MAIN] Calling estimateGWNumber...');
-    currentGW = await estimateGWNumber([]);
-    console.log('🚀 [MAIN] estimateGWNumber returned:', currentGW);
-  } else {
-    console.log('🚀 [MAIN] Skipping estimateGWNumber (currentGW already set)');
-  }
+  if (!currentGW) currentGW = await estimateGWNumber([]);
 
   // Clear stale cache entries older than the TTL to force fresh fixture data
   const now_ts = Date.now();
