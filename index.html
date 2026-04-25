@@ -576,7 +576,9 @@ async function renderLeaderboard() {
     });
 
     PLAYERS.forEach(name => {
-      const preds = livePredMap[name] || {};
+      // Strip star from name for lookup (DB has "Josh", PLAYERS has "Josh ⭐")
+      const nameWithoutStar = name.replace(/\s*⭐\s*/g, '');
+      const preds = livePredMap[nameWithoutStar] || {};
       let livePts = 0;
       Object.keys(liveResults).forEach(key => {
         const res = liveResults[key];
