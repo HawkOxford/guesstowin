@@ -642,6 +642,7 @@ async function renderLeaderboard() {
   const totals = PLAYERS.map(name => {
     // Strip star to normalize lookup (gwPoints uses names without stars)
     const nameKey = name.replace(/\s*⭐\s*/g, '');
+    console.log(`Player "${name}" → nameKey "${nameKey}" → gwPoints exists: ${!!gwPoints[nameKey]}`);
     const supabasePts = Object.values(gwPoints[nameKey]||{}).reduce((a,b)=>a+b,0);
     const total = supabasePts;
     const liveGWPts = gwPoints[nameKey]?.[currentGW] || 0;
