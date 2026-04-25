@@ -1049,11 +1049,23 @@ async function syncResultsToSupabase(gw, liveMatches) {
     return;
   }
 
-  // Build map: match_key -> gameweek (all rows will be currentGW)
-  const keyToGW = {};
+  // Build map: match_key -> gameweek
+  // If same match exists in multiple GWs (e.g., rescheduled), use the GW with most predictions
+  const keyToGWCounts = {}; // { match_key: { gw: count } }
   predRows.forEach(p => {
     const cleanKey = p.match_key.replace(/^\d+_/, '');
-    keyToGW[cleanKey] = p.gameweek;
+    if (!keyToGWCounts[cleanKey]) keyToGWCounts[cleanKey] = {};
+    keyToGWCounts[cleanKey][p.gameweek] = (keyToGWCounts[cleanKey][p.gameweek] || 0) + 1;
+  });
+
+  const keyToGW = {};
+  Object.keys(keyToGWCounts).forEach(key => {
+    // Pick the gameweek with the most predictions for this match
+    const gwCounts = keyToGWCounts[key];
+    const maxGW = Object.entries(gwCounts)
+      .sort((a, b) => b[1] - a[1]) // Sort by count descending
+      [0][0]; // Get gameweek with highest count
+    keyToGW[key] = parseInt(maxGW);
   });
 
   // Only write rows where we found a matching gameweek in predictions, and GW is valid (1-38)
