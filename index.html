@@ -670,8 +670,8 @@ async function renderLeaderboard() {
   // GW leader — find the most recent completed GW winner
   let gwLeaders = [];
   let gwLeaderGW = null;
-  // Use the most recent GW that has results (not necessarily currentGW which may be live)
-  const completedGWsForLeader = [...new Set((results||[]).map(r=>r.gameweek))].sort((a,b)=>b-a);
+  // Get latest GW from gwPoints
+  const completedGWsForLeader = [...allGWs].sort((a,b)=>b-a);
   const latestCompletedGW = completedGWsForLeader[0] || null;
   if(latestCompletedGW) {
     const gwScores = PLAYERS.map(n => {
@@ -2306,7 +2306,7 @@ async function calculateAndStorePoints(gw) {
       userPoints[pred.user_id] += pts;
     });
 
-    // Upsert points to database
+    // Upsert points to database using SECURITY DEFINER function
     const pointsRows = Object.entries(userPoints).map(([user_id, points]) => ({
       user_id,
       gameweek: gw,
@@ -2314,9 +2314,9 @@ async function calculateAndStorePoints(gw) {
     }));
 
     if (pointsRows.length > 0) {
-      const { error: upsertError } = await sb
-        .from('user_gameweek_points')
-        .upsert(pointsRows, { onConflict: 'user_id,gameweek' });
+      const { error: upsertError } = await sb.rpc('upsert_user_gameweek_points', {
+        points_data: pointsRows
+      });
 
       if (upsertError) {
         console.error('Failed to store points for GW' + gw, upsertError);
