@@ -1027,23 +1027,25 @@ async function syncResultsToSupabase(gw, liveMatches) {
     const away=cleanTeamName(m.awayTeam?.name)||'Away';
     // Map API status to lowercase database format
     const statusMap = { 'SCHEDULED': 'scheduled', 'IN_PLAY': 'in_play', 'FINISHED': 'finished' };
+    // Use 0 for null scores (database has NOT NULL constraint)
+    const homeScore = m.score?.fullTime?.home ?? 0;
+    const awayScore = m.score?.fullTime?.away ?? 0;
     return {
       key: `${home}_${away}`,
-      home_score: m.score?.fullTime?.home ?? null,
-      away_score: m.score?.fullTime?.away ?? null,
+      home_score: homeScore,
+      away_score: awayScore,
       status: statusMap[m.status] || 'scheduled'
     };
   });
 
   // Look up the correct gameweek for each match from the predictions table
-  // Each fixture is unique per season so we filter to currentGW only
+  // Don't filter by currentGW - let it find the actual GW from predictions (fixes circular dependency)
   const keys = matchData.map(m => m.key);
   const { data: predRows } = await sb.from('predictions').select('gameweek,match_key').limit(10000)
-    .in('match_key', keys)
-    .eq('gameweek', currentGW);
+    .in('match_key', keys);
 
   if (!predRows || !predRows.length) {
-    console.warn('No predictions found for finished matches in GW' + currentGW + ' — skipping result write');
+    console.warn('No predictions found for matches:', keys, '— skipping result write');
     return;
   }
 
