@@ -502,22 +502,20 @@ function calcPoints(predH, predA, actH, actA) {
 async function renderLeaderboard() {
   const section = document.getElementById('leaderboard-section');
 
-  // Load all Supabase data + live predictions for current GW in parallel
-  const [{data: results},{data: allPreds},{data: allProfiles}] = await Promise.all([
-    sb.from('results').select('gameweek,match_key,home_score,away_score,status').eq('status','finished').limit(5000),
-    sb.from('predictions').select('user_id,gameweek,match_key,home_score,away_score').limit(10000),
-    sb.from('profiles').select('id,player_name')
+  // Load profiles and stored points from database
+  const [{data: allProfiles}, {data: storedPoints}] = await Promise.all([
+    sb.from('profiles').select('id,player_name'),
+    sb.from('user_gameweek_points').select('user_id,gameweek,points').gte('gameweek', 1)
   ]);
-  const profileMap={};
-  (allProfiles||[]).forEach(p=>{ profileMap[p.id]=p.player_name; });
 
-  // Build points per player per GW from Supabase results
+  const profileMap = {};
+  (allProfiles || []).forEach(p => { profileMap[p.id] = p.player_name; });
+
+  // Build gwPoints from stored points table
   const gwPoints = {};
-  const gwWinners = {};
 
-  // Seed gwPoints with hardcoded GW1-26 data first
+  // Seed with hardcoded GW1-26 data
   PLAYERS.forEach(name => {
-    // Strip star to normalize key (all gwPoints should use same key format)
     const nameKey = name.replace(/\s*⭐\s*/g, '');
     const hist = HISTORICAL_GW_POINTS[name] || {};
     Object.entries(hist).forEach(([gw, pts]) => {
@@ -526,79 +524,31 @@ async function renderLeaderboard() {
     });
   });
 
-  if(results && allPreds) {
-    const resultMap = {};
-    results.forEach(r => { resultMap[`${r.gameweek}_${r.match_key}`] = r; });
+  // Add GW27+ from stored points
+  (storedPoints || []).forEach(row => {
+    const dbName = profileMap[row.user_id];
+    if (!dbName) return;
+    const name = dbName.replace(/\s*⭐\s*/g, '');
+    if (!gwPoints[name]) gwPoints[name] = {};
+    gwPoints[name][row.gameweek] = row.points;
+  });
 
-    // DEBUG: Track problem users
-    const problemUsers = ['Glurk', 'Richard', 'Teflon', 'Gaz', 'Craig'];
-    const gw29Debug = {};
+  // Build gwWinners for weekly pot calculations
+  const gwWinners = {};
+  // Get all unique gameweeks from gwPoints
+  const allGWs = new Set();
+  Object.values(gwPoints).forEach(playerGWs => {
+    Object.keys(playerGWs).forEach(gw => allGWs.add(parseInt(gw)));
+  });
 
-    allPreds.forEach(p => {
-      const dbName = profileMap[p.user_id];
-      if(!dbName) return;
-      // Strip star to normalize name (DB might have "Josh", PLAYERS has "Josh ⭐")
-      const name = dbName.replace(/\s*⭐\s*/g, '');
-
-      // DEBUG: Track GW29 predictions for problem users
-      if (p.gameweek === 29 && problemUsers.includes(name)) {
-        if (!gw29Debug[name]) gw29Debug[name] = { predictions: 0, matched: 0, unmatched: [] };
-        gw29Debug[name].predictions++;
-      }
-
-      // Try database results first, then fall back to liveResults (like "all predictions" table does)
-      let r = resultMap[`${p.gameweek}_${p.match_key}`];
-      let source = 'db';
-      if (!r) {
-        // Check liveResults using match_key without gameweek prefix
-        const cleanKey = p.match_key.replace(/^\d+_/, '');
-        r = liveResults[cleanKey];
-        source = 'live';
-      }
-
-      // DEBUG: Track matches/mismatches
-      if (p.gameweek === 29 && problemUsers.includes(name)) {
-        if (r) {
-          gw29Debug[name].matched++;
-        } else {
-          gw29Debug[name].unmatched.push(p.match_key);
-        }
-      }
-
-      if(!r) return;
-
-      // Only use Supabase calculated points for GW27+
-      if(p.gameweek < 27) return;
-      // Don't use ??0 - let calcPoints properly detect null/undefined predictions
-      const pts = calcPoints(p.home_score, p.away_score, r.home_score, r.away_score);
-      if(pts===null) return;
-      if(!gwPoints[name]) gwPoints[name]={};
-      gwPoints[name][p.gameweek] = (gwPoints[name][p.gameweek]||0) + pts;
+  [...allGWs].sort((a, b) => a - b).forEach(gw => {
+    const scores = PLAYERS.map(n => {
+      const nameKey = n.replace(/\s*⭐\s*/g, '');
+      return { name: n, pts: gwPoints[nameKey]?.[gw] || 0 };
     });
-
-    // DEBUG: Log GW29 matching results
-    console.log('=== GW29 DEBUG ===');
-    problemUsers.forEach(name => {
-      if (gw29Debug[name]) {
-        console.log(`${name}: ${gw29Debug[name].predictions} predictions, ${gw29Debug[name].matched} matched, ${gw29Debug[name].unmatched.length} unmatched`);
-        if (gw29Debug[name].unmatched.length > 0) {
-          console.log(`  Unmatched keys:`, gw29Debug[name].unmatched);
-        }
-      } else {
-        console.log(`${name}: NO GW29 predictions found in database`);
-      }
-    });
-
-    const gws = [...new Set(results.map(r=>r.gameweek))];
-    gws.forEach(gw => {
-      const scores = PLAYERS.map(n=>{
-        const nameKey = n.replace(/\s*⭐\s*/g, '');
-        return {name:n,pts:gwPoints[nameKey]?.[gw]||0};
-      });
-      const max = Math.max(...scores.map(s=>s.pts));
-      if(max>0) gwWinners[gw] = scores.filter(s=>s.pts===max).map(s=>s.name);
-    });
-  }
+    const max = Math.max(...scores.map(s => s.pts));
+    if (max > 0) gwWinners[gw] = scores.filter(s => s.pts === max).map(s => s.name);
+  });
 
   // Overlay live results for current GW
   // Fetch fresh live data if in live window, don't rely on global liveResults state
@@ -2295,6 +2245,90 @@ window.simulateStop = function() {
   console.log('Simulation stopped — reloading page.');
 };
 
+// ── Calculate and store points ───────────────────────────────────────────────
+async function calculateAndStorePoints(gw) {
+  if (!gw || gw < 1) return;
+
+  try {
+    // Fetch all predictions for this gameweek
+    const { data: predictions, error: predError } = await sb
+      .from('predictions')
+      .select('user_id, match_key, home_score, away_score')
+      .eq('gameweek', gw);
+
+    if (predError) {
+      console.error('Failed to fetch predictions for GW' + gw, predError);
+      return;
+    }
+
+    // Fetch results from database (finished results)
+    const { data: dbResults, error: resultError } = await sb
+      .from('results')
+      .select('match_key, home_score, away_score, status')
+      .eq('gameweek', gw);
+
+    if (resultError) {
+      console.error('Failed to fetch results for GW' + gw, resultError);
+      return;
+    }
+
+    // Build results map from database
+    const resultsMap = {};
+    (dbResults || []).forEach(r => {
+      resultsMap[r.match_key] = r;
+    });
+
+    // For current GW, also include liveResults
+    if (gw === currentGW && Object.keys(liveResults).length > 0) {
+      Object.entries(liveResults).forEach(([key, result]) => {
+        if (!resultsMap[key]) {
+          resultsMap[key] = result;
+        }
+      });
+    }
+
+    // Calculate points per user
+    const userPoints = {};
+    (predictions || []).forEach(pred => {
+      // Try exact match first, then try without gameweek prefix
+      let result = resultsMap[pred.match_key];
+      if (!result) {
+        const cleanKey = pred.match_key.replace(/^\d+_/, '');
+        result = resultsMap[cleanKey];
+      }
+
+      if (!result) return; // No result yet
+
+      const pts = calcPoints(pred.home_score, pred.away_score, result.home_score, result.away_score);
+      if (pts === null) return; // Invalid prediction
+
+      if (!userPoints[pred.user_id]) userPoints[pred.user_id] = 0;
+      userPoints[pred.user_id] += pts;
+    });
+
+    // Upsert points to database
+    const pointsRows = Object.entries(userPoints).map(([user_id, points]) => ({
+      user_id,
+      gameweek: gw,
+      points
+    }));
+
+    if (pointsRows.length > 0) {
+      const { error: upsertError } = await sb
+        .from('user_gameweek_points')
+        .upsert(pointsRows, { onConflict: 'user_id,gameweek' });
+
+      if (upsertError) {
+        console.error('Failed to store points for GW' + gw, upsertError);
+      } else {
+        console.log(`✓ Stored points for ${pointsRows.length} users in GW${gw}`);
+      }
+    }
+  } catch (e) {
+    console.error('calculateAndStorePoints error:', e);
+  }
+}
+
 // Run sync immediately on load then every 60s
 setTimeout(syncLiveResults, 5000); // 5s after load to let auth settle
 
@@ -2339,10 +2373,27 @@ async function syncLiveResults() {
 
   if (thisWeekendMatches.length) {
     await syncResultsToSupabase(currentGW, thisWeekendMatches);
+    // Calculate and store points after syncing results
+    await calculateAndStorePoints(currentGW);
   }
   // Note: screen rendering is handled by refreshTimer (every 30s) — no render here to avoid duplication
 }
 setInterval(syncLiveResults, 60000);
+
+// Backfill historical points (run once on load)
+async function backfillPoints() {
+  if (!currentGW) return;
+  console.log('Backfilling points for GW27-' + currentGW);
+  for (let gw = 27; gw <= currentGW; gw++) {
+    await calculateAndStorePoints(gw);
+    // Small delay to avoid rate limiting
+    await new Promise(resolve => setTimeout(resolve, 100));
+  }
+}
+// Run backfill 10s after load (after sync has settled)
+setTimeout(() => {
+  if (currentUser && currentGW) backfillPoints();
+}, 10000);
 
 // ── Auto-advance score inputs ─────────────────────────────────────────────────
 // When a single digit is entered, move focus to the next score input
