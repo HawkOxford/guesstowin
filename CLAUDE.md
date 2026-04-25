@@ -267,7 +267,67 @@ estimateGWNumber()          — derives current GW from results + predictions ta
 loadAllPredictions(gw)      — loads all player predictions for a GW from Supabase
 buildLiveResults()          — populates liveResults{} from API match data
 ```
+
 ---
+
+## Recent Fixes — 25 April 2026
+
+### Live GW Points Not Updating for Players with Champion Stars ✅
+
+**Problem:** Glurk, Richard, Teflon, and Gaz showing 0 points for "this GW" on leaderboard despite having predictions that should be scoring points.
+
+**Root cause:** 
+- Database `profiles.player_name` has names WITHOUT stars: "Josh", "Richard", "Gaz"
+- `PLAYERS` array has names WITH stars for champions: "Josh ⭐", "Richard ⭐", "Gaz ⭐"
+- When building `livePredMap` (line 570-576), it uses database names (without stars) as keys
+- When iterating over `PLAYERS` (line 578), it uses names WITH stars to lookup predictions
+- Lookup failed: `livePredMap["Josh ⭐"]` is undefined because livePredMap only has "Josh"
+
+**Fix applied (line 579-580):**
+```javascript
+// Strip star from name for lookup (DB has "Josh", PLAYERS has "Josh ⭐")
+const nameWithoutStar = name.replace(/\s*⭐\s*/g, '');
+const preds = livePredMap[nameWithoutStar] || {};
+```
+
+**Files modified:**
+- `index.html` — Added star-stripping in leaderboard live points calculation
+
+**Result:**
+- ✅ Josh, Richard, and Gaz now show correct live GW points
+- ✅ Handles any player name with star emoji
+- ✅ Maintains star display in UI while fixing backend lookups
+
+**Committed:** d1d131b
+
+---
+
+### Leaderboard Refresh Interval Reduced to 30s ✅
+
+**Problem:** Leaderboard "points this GW" not updating in real-time during live matches.
+
+**Root cause:** Leaderboard auto-refreshed every 60 seconds, but Scores tab updates live scores every 30 seconds, causing a delay in leaderboard points.
+
+**Fix applied (line 486-488):**
+```javascript
+// Auto-refresh leaderboard every 30s during live weekend to match Scores tab refresh rate
+setInterval(() => {
+  if (deadlinePassed) renderLeaderboard();
+}, 30000);  // Changed from 60000
+```
+
+**Files modified:**
+- `index.html` — Reduced leaderboard refresh interval from 60s to 30s
+
+**Result:**
+- ✅ Leaderboard now updates every 30 seconds during live gameweeks
+- ✅ "Points this GW" updates in sync with live match scores
+- ✅ Matches Scores tab refresh rate for consistent UX
+
+**Committed:** 088514d
+
+---
+
 Pending Code Improvements (low priority — do in quiet week)
 Safe to do anytime
 Remove `renderLeaderboardGuest` one-liner (just calls `renderLeaderboard` directly)
