@@ -902,51 +902,27 @@ function formatMatchTime(utcDate) {
 
 async function estimateGWNumber(matches) {
   try {
-    const { data: resultRows } = await sb.from('results').select('gameweek,match_key,status').limit(5000);
+    const { data: resultRows } = await sb.from('results').select('gameweek,status').limit(5000);
     const validRows = (resultRows || []).filter(r => r.gameweek >= 1 && r.gameweek <= 38);
     if (!validRows.length) return 1;
 
-    // Count unique finished results per GW
+    // Count finished results per GW (simple count, not unique match_keys)
     const finishedCounts = {};
     validRows.forEach(r => {
       if (r.status === 'finished') {
-        if (!finishedCounts[r.gameweek]) finishedCounts[r.gameweek] = new Set();
-        finishedCounts[r.gameweek].add(r.match_key);
+        finishedCounts[r.gameweek] = (finishedCounts[r.gameweek] || 0) + 1;
       }
     });
 
-    // Get expected fixture count per GW from predictions table (most reliable source)
-    const { data: predRows } = await sb.from('predictions').select('gameweek,match_key').limit(10000);
-    const fixtureCounts = {};
-    (predRows || []).forEach(p => {
-      const key = p.match_key.replace(/^\d+_/, '');
-      if (!fixtureCounts[p.gameweek]) fixtureCounts[p.gameweek] = new Set();
-      fixtureCounts[p.gameweek].add(key);
-    });
-
-    // A GW is complete when all its expected fixtures are finished
-    const allGWs = [...new Set([...Object.keys(finishedCounts), ...Object.keys(fixtureCounts)])].map(Number).sort((a,b) => a-b);
-    const completedGWs = allGWs.filter(gw => {
-      const finishedCount = finishedCounts[gw] ? finishedCounts[gw].size : 0;
-      // Use matches.length if available, otherwise fixtureCounts from predictions table
-      // NO hardcoded fallback - if we don't know expected count, skip this GW
-      let expectedCount;
-      if (matches && matches.length > 0) {
-        expectedCount = matches.length;
-      } else if (fixtureCounts[gw]) {
-        expectedCount = fixtureCounts[gw].size;
-      } else {
-        return false; // Can't determine if complete without expected count
-      }
-      // Only complete if we have finished all expected fixtures
-      const isComplete = finishedCount >= expectedCount && finishedCount > 0;
-      console.log(`GW${gw}: finished=${finishedCount}, expected=${expectedCount}, complete=${isComplete}`);
-      return isComplete;
-    });
+    // A GW is complete when it has >= 7 finished results (weekend-only threshold)
+    const completedGWs = Object.keys(finishedCounts)
+      .map(Number)
+      .filter(gw => finishedCounts[gw] >= 7)
+      .sort((a, b) => b - a);
 
     if (!completedGWs.length) return 1;
-    const maxCompleted = Math.max(...completedGWs);
-    console.log(`Max completed GW: ${maxCompleted}, completedGWs:`, completedGWs);
+    const maxCompleted = completedGWs[0];
+    console.log(`Max completed GW: ${maxCompleted}, finished counts:`, finishedCounts);
 
     // Get UK time including hours and minutes
     const ukTime = new Date().toLocaleString('en-GB', {timeZone:'Europe/London', hour12:false});
