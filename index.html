@@ -2250,80 +2250,32 @@ async function calculateAndStorePoints(gw) {
   if (!gw || gw < 1) return;
 
   try {
-    // Fetch all predictions for this gameweek
-    const { data: predictions, error: predError } = await sb
-      .from('predictions')
-      .select('user_id, match_key, home_score, away_score')
-      .eq('gameweek', gw);
+    const SUPABASE_URL = 'https://iufbdwsmbwrtcqzkvyey.supabase.co';
+    const edgeFunctionUrl = `${SUPABASE_URL}/functions/v1/calculate-points`;
 
-    if (predError) {
-      console.error('Failed to fetch predictions for GW' + gw, predError);
-      return;
-    }
-
-    // Fetch results from database (finished results)
-    const { data: dbResults, error: resultError } = await sb
-      .from('results')
-      .select('match_key, home_score, away_score, status')
-      .eq('gameweek', gw);
-
-    if (resultError) {
-      console.error('Failed to fetch results for GW' + gw, resultError);
-      return;
-    }
-
-    // Build results map from database
-    const resultsMap = {};
-    (dbResults || []).forEach(r => {
-      resultsMap[r.match_key] = r;
-    });
-
-    // For current GW, also include liveResults
-    if (gw === currentGW && Object.keys(liveResults).length > 0) {
-      Object.entries(liveResults).forEach(([key, result]) => {
-        if (!resultsMap[key]) {
-          resultsMap[key] = result;
-        }
-      });
-    }
-
-    // Calculate points per user
-    const userPoints = {};
-    (predictions || []).forEach(pred => {
-      // Try exact match first, then try without gameweek prefix
-      let result = resultsMap[pred.match_key];
-      if (!result) {
-        const cleanKey = pred.match_key.replace(/^\d+_/, '');
-        result = resultsMap[cleanKey];
-      }
-
-      if (!result) return; // No result yet
-
-      const pts = calcPoints(pred.home_score, pred.away_score, result.home_score, result.away_score);
-      if (pts === null) return; // Invalid prediction
-
-      if (!userPoints[pred.user_id]) userPoints[pred.user_id] = 0;
-      userPoints[pred.user_id] += pts;
-    });
-
-    // Upsert points to database using SECURITY DEFINER function
-    const pointsRows = Object.entries(userPoints).map(([user_id, points]) => ({
-      user_id,
+    // For current GW, include liveResults
+    const payload = {
       gameweek: gw,
-      points
-    }));
+      liveResults: gw === currentGW ? liveResults : null
+    };
 
-    if (pointsRows.length > 0) {
-      const { error: upsertError } = await sb.rpc('upsert_user_gameweek_points', {
-        points_data: pointsRows
-      });
+    const response = await fetch(edgeFunctionUrl, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${SUPABASE_KEY}`
+      },
+      body: JSON.stringify(payload)
+    });
 
-      if (upsertError) {
-        console.error('Failed to store points for GW' + gw, upsertError);
-      } else {
-        console.log(`✓ Stored points for ${pointsRows.length} users in GW${gw}`);
-      }
+    if (!response.ok) {
+      const error = await response.json();
+      console.error(`Failed to calculate points for GW${gw}:`, error);
+      return;
     }
+
+    const result = await response.json();
+    console.log(`✓ ${result.message}`);
   } catch (e) {
     console.error('calculateAndStorePoints error:', e);
   }
