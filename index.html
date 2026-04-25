@@ -564,7 +564,7 @@ async function renderLeaderboard() {
     if (freshLive && freshLive.length) buildLiveResults(freshLive);
   }
 
-  if (currentGW && (deadlinePassed || isLiveWindow) && Object.keys(liveResults).length) {
+  if (currentGW && (deadlinePassed || isLiveWindow) && currentMatches && currentMatches.length) {
     // Build prediction map from allPreds for current GW
     const livePredMap = {};
     (allPreds||[]).filter(p=>p.gameweek===currentGW).forEach(p => {
@@ -580,9 +580,13 @@ async function renderLeaderboard() {
       const nameWithoutStar = name.replace(/\s*⭐\s*/g, '');
       const preds = livePredMap[nameWithoutStar] || {};
       let livePts = 0;
-      Object.keys(liveResults).forEach(key => {
-        const res = liveResults[key];
+      // Use currentMatches like Scores tab does (ensures all matches checked)
+      currentMatches.forEach(m => {
+        const home = cleanTeamName(m.homeTeam?.name) || 'Home';
+        const away = cleanTeamName(m.awayTeam?.name) || 'Away';
+        const key = `${home}_${away}`;
         const pred = preds[key];
+        const res = liveResults[key];
         if (pred && res && res.home !== null) {
           const pts = calcPoints(pred.home, pred.away, res.home, res.away);
           if (pts !== null) livePts += pts;
