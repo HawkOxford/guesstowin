@@ -904,16 +904,28 @@ async function estimateGWNumber(matches) {
   try {
     const { data: allResults } = await sb.from('results').select('gameweek,status').range(0, 4999);
 
+    // Count finished results per GW
     const finishedCounts = {};
+    // Count TOTAL results per GW (all statuses) - this is the expected fixture count
+    const totalCounts = {};
+
     (allResults || []).forEach(r => {
-      if (r.status === 'finished') {
-        finishedCounts[r.gameweek] = (finishedCounts[r.gameweek] || 0) + 1;
+      if (r.gameweek >= 1 && r.gameweek <= 38) {
+        totalCounts[r.gameweek] = (totalCounts[r.gameweek] || 0) + 1;
+        if (r.status === 'finished') {
+          finishedCounts[r.gameweek] = (finishedCounts[r.gameweek] || 0) + 1;
+        }
       }
     });
 
-    const completedGWs = Object.keys(finishedCounts)
+    // GW is complete when finished count >= total count for that GW (dynamic per GW)
+    const completedGWs = Object.keys(totalCounts)
       .map(Number)
-      .filter(gw => finishedCounts[gw] >= 9)
+      .filter(gw => {
+        const finished = finishedCounts[gw] || 0;
+        const total = totalCounts[gw] || 0;
+        return finished >= total && total > 0;
+      })
       .sort((a, b) => b - a);
 
     const maxCompleted = completedGWs.length > 0 ? completedGWs[0] : 0;
