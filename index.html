@@ -631,11 +631,11 @@ async function renderLeaderboard() {
     prevRank++;
   }
 
-  // DEBUG: Check gwPoints for champion players
+  // DEBUG: Check gwPoints for ALL players
   console.log('gwPoints keys:', Object.keys(gwPoints));
-  ['Josh', 'Richard', 'Gaz'].forEach(name => {
-    console.log(`${name} gwPoints:`, gwPoints[name]);
-    console.log(`${name} total:`, Object.values(gwPoints[name]||{}).reduce((a,b)=>a+b,0));
+  Object.keys(gwPoints).forEach(name => {
+    const total = Object.values(gwPoints[name]||{}).reduce((a,b)=>a+b,0);
+    console.log(`${name}: ${total} points`, gwPoints[name]);
   });
 
   // Calculate totals AFTER live overlay is applied
@@ -659,7 +659,10 @@ async function renderLeaderboard() {
   }).sort((a,b)=>b.total-a.total);
 
   // DEBUG: Check totals array
-  console.log('totals array:', totals);
+  console.log('=== CALCULATED TOTALS ===');
+  totals.forEach(t => {
+    console.log(`${t.name}: ${t.total} points (base: ${t.baseTotal}, live: ${t.liveGWPts})`);
+  });
 
   // Assign ranks
   let rank=1;
