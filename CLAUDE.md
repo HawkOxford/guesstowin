@@ -476,6 +476,41 @@ PLAYERS.forEach(name => {
 
 ---
 
+### Bug #3: Premature GW Advancement (GW29→GW30) — Sync Only Writing Finished Matches ✅
+
+**Date:** 25 April 2026
+
+**Problem:** App showed GW29 with only 1 fixture (Fulham v AVL) and incorrectly advanced to GW30, even though GW29 had 5 weekend fixtures total.
+
+**Root cause:** `syncLiveResults` (line 2263-2265) only wrote FINISHED matches to the results table:
+```javascript
+return m.status === 'FINISHED' && currentMatchKeys.has(key);
+```
+
+When GW29 had 5 fixtures but only Fulham v AVL finished, only 1 row was written. Then `estimateGWNumber` (line 925-962) counted:
+- `totalCounts[29] = 1` (only 1 result row)
+- `finishedCounts[29] = 1` (that 1 row was finished)
+- Concluded: `finished >= total` → GW29 complete → advanced to GW30
+
+**Fix applied:**
+
+1. **syncLiveResults** (line 2259-2270): Changed filter to include ALL weekend fixtures (scheduled/in_play/finished), not just finished
+2. **syncResultsToSupabase** (line 999-1068): 
+   - Removed `finished` filter
+   - Added status mapping: API statuses (SCHEDULED/IN_PLAY/FINISHED) → lowercase (scheduled/in_play/finished)
+   - Allows null scores for scheduled matches
+   - Writes actual match status from API instead of hardcoding 'finished'
+
+**Result:**
+- ✅ All weekend fixtures now written to results table immediately (with status='scheduled')
+- ✅ `estimateGWNumber` sees correct total fixture count (e.g., 5 for GW29)
+- ✅ GW only advances when ALL fixtures are finished, not just 1 of 5
+- ✅ Also fixes points calculation issues (Bugs #1 & #2) - players can now be scored against all fixtures, not just the 1 that finished
+
+**Committed:** f49d669
+
+---
+
 Pending Code Improvements (low priority — do in quiet week)
 Safe to do anytime
 Remove `renderLeaderboardGuest` one-liner (just calls `renderLeaderboard` directly)
