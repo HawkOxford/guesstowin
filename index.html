@@ -482,10 +482,10 @@ function switchTab(tab,btn) {
   if(tab==='admin') renderAdmin();
 }
 
-// Auto-refresh leaderboard every 60s during live weekend regardless of active tab
+// Auto-refresh leaderboard every 30s during live weekend to match Scores tab refresh rate
 setInterval(() => {
   if (deadlinePassed) renderLeaderboard();
-}, 60000);
+}, 30000);
 
 // ── Scoring logic ─────────────────────────────────────────────────────────────
 function calcPoints(predH, predA, actH, actA) {
