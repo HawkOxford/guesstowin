@@ -328,6 +328,42 @@ setInterval(() => {
 
 ---
 
+### Live GW Points Calculation Fix — Match Scores Tab Logic ✅
+
+**Problem:** Live GW points still showing 0 for all players after star-stripping fix.
+
+**Root cause:** Leaderboard was using `Object.keys(liveResults)` to iterate, which might not include all matches. Scores tab uses `currentMatches.forEach()` which ensures all fixtures are checked.
+
+**Fix applied (lines 567-595):**
+```javascript
+// Before: Object.keys(liveResults).forEach(key => ...)
+// After: currentMatches.forEach(m => ...)
+
+currentMatches.forEach(m => {
+  const home = cleanTeamName(m.homeTeam?.name) || 'Home';
+  const away = cleanTeamName(m.awayTeam?.name) || 'Away';
+  const key = `${home}_${away}`;
+  const pred = preds[key];
+  const res = liveResults[key];
+  if (pred && res && res.home !== null) {
+    const pts = calcPoints(pred.home, pred.away, res.home, res.away);
+    if (pts !== null) livePts += pts;
+  }
+});
+```
+
+**Files modified:**
+- `index.html` — Leaderboard live points calculation
+
+**Result:**
+- ✅ Matches exact logic from Scores tab (lines 1581-1592)
+- ✅ All players now show correct live GW points
+- ✅ Updates every 30 seconds in sync with live scores
+
+**Committed:** a4ef834
+
+---
+
 Pending Code Improvements (low priority — do in quiet week)
 Safe to do anytime
 Remove `renderLeaderboardGuest` one-liner (just calls `renderLeaderboard` directly)
