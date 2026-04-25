@@ -529,8 +529,10 @@ async function renderLeaderboard() {
     results.forEach(r => { resultMap[`${r.gameweek}_${r.match_key}`] = r; });
 
     allPreds.forEach(p => {
-      const name = profileMap[p.user_id];
-      if(!name) return;
+      const dbName = profileMap[p.user_id];
+      if(!dbName) return;
+      // Strip star to normalize name (DB might have "Josh", PLAYERS has "Josh ⭐")
+      const name = dbName.replace(/\s*⭐\s*/g, '');
       const r = resultMap[`${p.gameweek}_${p.match_key}`];
       if(!r) return;
       // Only use Supabase calculated points for GW27+
@@ -544,7 +546,10 @@ async function renderLeaderboard() {
 
     const gws = [...new Set(results.map(r=>r.gameweek))];
     gws.forEach(gw => {
-      const scores = PLAYERS.map(n=>({name:n,pts:gwPoints[n]?.[gw]||0}));
+      const scores = PLAYERS.map(n=>{
+        const nameKey = n.replace(/\s*⭐\s*/g, '');
+        return {name:n,pts:gwPoints[nameKey]?.[gw]||0};
+      });
       const max = Math.max(...scores.map(s=>s.pts));
       if(max>0) gwWinners[gw] = scores.filter(s=>s.pts===max).map(s=>s.name);
     });
@@ -592,22 +597,27 @@ async function renderLeaderboard() {
           if (pts !== null) livePts += pts;
         }
       });
-      if (!gwPoints[name]) gwPoints[name] = {};
+      if (!gwPoints[nameWithoutStar]) gwPoints[nameWithoutStar] = {};
       // Use whichever is higher — Supabase stored or live calculated
-      if (livePts >= (gwPoints[name][currentGW]||0)) {
-        gwPoints[name][currentGW] = livePts;
+      if (livePts >= (gwPoints[nameWithoutStar][currentGW]||0)) {
+        gwPoints[nameWithoutStar][currentGW] = livePts;
       }
     });
 
     // Recalculate GW winner with live data
-    const liveScores = PLAYERS.map(n=>({name:n,pts:gwPoints[n]?.[currentGW]||0}));
+    const liveScores = PLAYERS.map(n=>{
+      const nameKey = n.replace(/\s*⭐\s*/g, '');
+      return {name:n,pts:gwPoints[nameKey]?.[currentGW]||0};
+    });
     const liveMax = Math.max(...liveScores.map(s=>s.pts));
     if(liveMax>0) gwWinners[currentGW] = liveScores.filter(s=>s.pts===liveMax).map(s=>s.name);
   }
 
   // Calculate base totals (without live GW) for previous standings comparison
   const baseTotals = PLAYERS.map(name => {
-    const prevGWs = Object.entries(gwPoints[name]||{}).filter(([gw]) => parseInt(gw) < (currentGW||999));
+    // Strip star to normalize lookup
+    const nameKey = name.replace(/\s*⭐\s*/g, '');
+    const prevGWs = Object.entries(gwPoints[nameKey]||{}).filter(([gw]) => parseInt(gw) < (currentGW||999));
     const prevPts = prevGWs.reduce((a,[,b])=>a+b,0);
     return { name, total: prevPts };
   }).sort((a,b)=>b.total-a.total);
@@ -621,11 +631,13 @@ async function renderLeaderboard() {
 
   // Calculate totals AFTER live overlay is applied
   const totals = PLAYERS.map(name => {
-    const supabasePts = Object.values(gwPoints[name]||{}).reduce((a,b)=>a+b,0);
+    // Strip star to normalize lookup (gwPoints uses names without stars)
+    const nameKey = name.replace(/\s*⭐\s*/g, '');
+    const supabasePts = Object.values(gwPoints[nameKey]||{}).reduce((a,b)=>a+b,0);
     const total = supabasePts;
-    const liveGWPts = gwPoints[name]?.[currentGW] || 0;
+    const liveGWPts = gwPoints[nameKey]?.[currentGW] || 0;
     // Base total without current GW live points (for +N display)
-    const prevGWPts = Object.entries(gwPoints[name]||{})
+    const prevGWPts = Object.entries(gwPoints[nameKey]||{})
       .filter(([gw]) => parseInt(gw) < (currentGW||999))
       .reduce((a,[,b])=>a+b,0);
     const baseTotal = prevGWPts;
@@ -653,7 +665,10 @@ async function renderLeaderboard() {
   const completedGWsForLeader = [...new Set((results||[]).map(r=>r.gameweek))].sort((a,b)=>b-a);
   const latestCompletedGW = completedGWsForLeader[0] || null;
   if(latestCompletedGW) {
-    const gwScores = PLAYERS.map(n => ({name:n, pts: gwPoints[n]?.[latestCompletedGW]||0}));
+    const gwScores = PLAYERS.map(n => {
+      const nameKey = n.replace(/\s*⭐\s*/g, '');
+      return {name:n, pts: gwPoints[nameKey]?.[latestCompletedGW]||0};
+    });
     const maxGW = Math.max(...gwScores.map(s=>s.pts));
     if(maxGW > 0) {
       gwLeaders = gwScores.filter(s=>s.pts===maxGW).map(s=>s.name);
