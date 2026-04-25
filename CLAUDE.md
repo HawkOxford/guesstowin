@@ -511,6 +511,39 @@ When GW29 had 5 fixtures but only Fulham v AVL finished, only 1 row was written.
 
 ---
 
+### Complete Fix for GW Detection Issues — Three Root Causes ✅
+
+**Date:** 25 April 2026 (final fixes)
+
+**Problem:** App showed GW30 instead of GW29, displayed wrong fixtures, marked live GW as complete.
+
+**Root Cause #1: Sync only wrote FINISHED matches**
+- Fixed in commit f49d669 (see above)
+
+**Root Cause #2: Circular dependency - sync filtered predictions by wrong currentGW**
+- Sync queried: `predictions WHERE gameweek = currentGW (30)`
+- But GW29 matches had predictions in GW29
+- Query returned empty → sync failed → currentGW stayed wrong
+- **Fix (commit d680841):** Removed `.eq('gameweek', currentGW)` filter, search ALL gameweeks
+
+**Root Cause #3: Rescheduled matches had predictions in multiple GWs**
+- Arsenal, Liverpool, West Ham, Wolves were rescheduled from GW28 → GW29
+- Had 1 prediction in GW28 (old), 10 predictions in GW29 (new)
+- Old code: `forEach` overwrote, last GW wins (non-deterministic)
+- Could assign matches to wrong GW (28 instead of 29)
+- **Fix (commit b4ff936):** Count predictions per GW, use GW with most predictions
+
+**Complete solution:**
+1. Sync writes ALL weekend fixtures (scheduled/in_play/finished) → correct total count
+2. Sync searches ALL GWs for predictions → breaks circular dependency
+3. Use GW with most predictions → handles rescheduled matches correctly
+4. Use 0 for scheduled match scores → satisfies NOT NULL constraint
+5. Manual cleanup: Delete orphaned GW28 predictions for rescheduled matches
+
+**Deployed:** c2bb624 (debug cleanup)
+
+---
+
 Pending Code Improvements (low priority — do in quiet week)
 Safe to do anytime
 Remove `renderLeaderboardGuest` one-liner (just calls `renderLeaderboard` directly)
