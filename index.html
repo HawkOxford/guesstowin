@@ -530,6 +530,22 @@ async function renderLeaderboard() {
     const resultMap = {};
     results.forEach(r => { resultMap[`${r.gameweek}_${r.match_key}`] = r; });
 
+    // DEBUG GW29 for affected players
+    const affectedPlayers = ['Glurk', 'Josh', 'Richard', 'Teflon', 'Gaz', 'Craig'];
+    const gw29Preds = allPreds.filter(p => p.gameweek === 29);
+    console.log('=== GW29 DEBUG ===');
+    console.log('Total GW29 predictions:', gw29Preds.length);
+    affectedPlayers.forEach(name => {
+      const playerPreds = gw29Preds.filter(p => {
+        const dbName = profileMap[p.user_id];
+        return dbName && dbName.replace(/\s*⭐\s*/g, '') === name;
+      });
+      console.log(`${name} GW29 predictions:`, playerPreds.length, playerPreds);
+    });
+    const gw29Results = results.filter(r => r.gameweek === 29);
+    console.log('GW29 results:', gw29Results.length, gw29Results);
+    console.log('==================');
+
     allPreds.forEach(p => {
       const dbName = profileMap[p.user_id];
       if(!dbName) return;
@@ -541,6 +557,12 @@ async function renderLeaderboard() {
       if(p.gameweek < 27) return;
       // Don't use ??0 - let calcPoints properly detect null/undefined predictions
       const pts = calcPoints(p.home_score, p.away_score, r.home_score, r.away_score);
+
+      // DEBUG GW29 for affected players
+      if(p.gameweek === 29 && affectedPlayers.includes(name)) {
+        console.log(`[GW29 ${name}] ${p.match_key}: pred ${p.home_score}-${p.away_score}, result ${r.home_score}-${r.away_score}, points: ${pts}`);
+      }
+
       if(pts===null) return;
       if(!gwPoints[name]) gwPoints[name]={};
       gwPoints[name][p.gameweek] = (gwPoints[name][p.gameweek]||0) + pts;
