@@ -2007,17 +2007,35 @@ async function renderAdmin() {
   const section = document.getElementById('admin-section');
   section.innerHTML = '<div class="state-box"><div class="spinner"></div><div>Loading admin data…</div></div>';
 
-  // Load all data in parallel
-  const [
-    { data: profiles },
-    { data: preds },
-    { data: results },
-    { data: storedPoints }
-  ] = await Promise.all([
-    sb.from('profiles').select('id,player_name'),
-    sb.from('predictions').select('user_id,gameweek,match_key,home_score,away_score', { count: 'exact' }).range(0, 19999),
-    sb.from('results').select('gameweek,match_key,home_score,away_score,status').eq('status','finished').range(0, 9999),
-    sb.from('user_gameweek_points').select('user_id,gameweek,points').range(0, 9999)
+  // Helper: Paginate Supabase queries (max 1000 rows per request)
+  async function fetchAllRows(table, columns, filters = []) {
+    const allRows = [];
+    let from = 0;
+    const pageSize = 1000;
+
+    while (true) {
+      let query = sb.from(table).select(columns).range(from, from + pageSize - 1);
+      filters.forEach(([method, ...args]) => {
+        query = query[method](...args);
+      });
+
+      const { data, error } = await query;
+      if (error || !data || data.length === 0) break;
+
+      allRows.push(...data);
+      if (data.length < pageSize) break; // Last page
+      from += pageSize;
+    }
+
+    return allRows;
+  }
+
+  // Load all data with proper pagination
+  const [profiles, preds, results, storedPoints] = await Promise.all([
+    fetchAllRows('profiles', 'id,player_name'),
+    fetchAllRows('predictions', 'user_id,gameweek,match_key,home_score,away_score'),
+    fetchAllRows('results', 'gameweek,match_key,home_score,away_score,status', [['eq', 'status', 'finished']]),
+    fetchAllRows('user_gameweek_points', 'user_id,gameweek,points')
   ]);
 
   const profileMap = {};
