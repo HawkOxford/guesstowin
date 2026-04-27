@@ -2031,11 +2031,19 @@ async function renderAdmin() {
   // Live results comparison
   const liveMatchData = Object.keys(liveResults).length ? liveResults : null;
 
-  // Build results map
+  // Build match_key -> result map (results are source of truth for which GW a match belongs to)
   const resultMap = {};
+  const matchKeyToGW = {};
+  const gwFixtureCounts = {};
+
   (results||[]).forEach(r => {
     const key = r.match_key.replace(/^\d+_/, '');
-    resultMap[`${r.gameweek}_${key}`] = r;
+    resultMap[key] = r;
+    matchKeyToGW[key] = r.gameweek;
+
+    // Track fixture count per GW from results
+    if (!gwFixtureCounts[r.gameweek]) gwFixtureCounts[r.gameweek] = 0;
+    gwFixtureCounts[r.gameweek]++;
   });
 
   // Build points per player per GW
@@ -2053,39 +2061,46 @@ async function renderAdmin() {
   (preds||[]).forEach(p => {
     const name = profileMap[p.user_id];
     if (!name || !PLAYERS.includes(name)) return;
-    // Only use Supabase calculated points for GW27+
-    if (p.gameweek < 27) return;
-    const key = p.match_key.replace(/^\d+_/, '');
-    const r = resultMap[`${p.gameweek}_${key}`];
-    if (!r) return;
-    // Don't use ??0 - let calcPoints properly detect null/undefined predictions
-    const pts = calcPoints(p.home_score, p.away_score, r.home_score, r.away_score);
+
+    const matchKey = p.match_key.replace(/^\d+_/, '');
+    const result = resultMap[matchKey];
+    if (!result) return; // No result for this match yet
+
+    const gw = result.gameweek;
+    if (gw < 27) return; // Only use Supabase calculated points for GW27+
+
+    const pts = calcPoints(p.home_score, p.away_score, result.home_score, result.away_score);
     if (pts === null) return;
+
     if (!gwPoints[name]) gwPoints[name] = {};
-    gwPoints[name][p.gameweek] = (gwPoints[name][p.gameweek]||0) + pts;
+    gwPoints[name][gw] = (gwPoints[name][gw]||0) + pts;
   });
 
-  // Submission counts per GW and fixture counts per GW
+  // Build submission counts per GW (using predictions.gameweek since we need to show all GWs including future ones)
   const subMap = {};
-  const gwFixtureCounts = {};
   (preds||[]).forEach(p => {
     const name = profileMap[p.user_id];
     if (!name || !PLAYERS.includes(name)) return;
-
-    // Track unique fixtures per GW
-    if (!gwFixtureCounts[p.gameweek]) gwFixtureCounts[p.gameweek] = new Set();
-    const matchKey = p.match_key.replace(/^\d+_/, '');
-    gwFixtureCounts[p.gameweek].add(matchKey);
-
-    // Count submissions (only genuinely submitted scores)
     if (p.home_score == null || p.away_score == null) return;
+
     if (!subMap[p.gameweek]) subMap[p.gameweek] = {};
     subMap[p.gameweek][name] = (subMap[p.gameweek][name]||0) + 1;
+
+    // Also track fixture count from predictions for future GWs (where results don't exist yet)
+    if (!gwFixtureCounts[p.gameweek]) gwFixtureCounts[p.gameweek] = new Set();
+    if (typeof gwFixtureCounts[p.gameweek] === 'number') {
+      // Already have count from results, skip
+    } else {
+      const matchKey = p.match_key.replace(/^\d+_/, '');
+      gwFixtureCounts[p.gameweek].add(matchKey);
+    }
   });
 
-  // Convert fixture counts from Sets to numbers
+  // Convert future GW fixture counts from Sets to numbers
   Object.keys(gwFixtureCounts).forEach(gw => {
-    gwFixtureCounts[gw] = gwFixtureCounts[gw].size;
+    if (gwFixtureCounts[gw] instanceof Set) {
+      gwFixtureCounts[gw] = gwFixtureCounts[gw].size;
+    }
   });
 
   section.innerHTML = `
