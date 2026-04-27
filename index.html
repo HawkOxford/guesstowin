@@ -2031,7 +2031,7 @@ async function renderAdmin() {
   // Live results comparison
   const liveMatchData = Object.keys(liveResults).length ? liveResults : null;
 
-  // Build match_key -> result map (results are source of truth for which GW a match belongs to)
+  // PASS 1: Build maps from results (source of truth for past GWs)
   const resultMap = {};
   const matchKeyToGW = {};
   const gwFixtureCounts = {};
@@ -2046,61 +2046,52 @@ async function renderAdmin() {
     gwFixtureCounts[r.gameweek]++;
   });
 
-  // Build points per player per GW
-  // Start with HISTORICAL_GW_POINTS for GW1-26
+  // PASS 2: Build points and submission maps from predictions
   const gwPoints = {};
+  const subMap = {};
+  const futureGWFixtures = {}; // Track unique fixtures for future GWs
+
+  // Initialize gwPoints with historical data (GW1-26)
   PLAYERS.forEach(name => {
+    gwPoints[name] = {};
     const hist = HISTORICAL_GW_POINTS[name] || {};
     Object.entries(hist).forEach(([gw, pts]) => {
-      if (!gwPoints[name]) gwPoints[name] = {};
       gwPoints[name][parseInt(gw)] = pts;
     });
   });
 
-  // Add Supabase calculated points for GW27+
+  // Process all predictions
   (preds||[]).forEach(p => {
     const name = profileMap[p.user_id];
     if (!name || !PLAYERS.includes(name)) return;
 
     const matchKey = p.match_key.replace(/^\d+_/, '');
     const result = resultMap[matchKey];
-    if (!result) return; // No result for this match yet
 
-    const gw = result.gameweek;
-    if (gw < 27) return; // Only use Supabase calculated points for GW27+
+    // Calculate points if result exists (GW27+)
+    if (result && result.gameweek >= 27) {
+      const pts = calcPoints(p.home_score, p.away_score, result.home_score, result.away_score);
+      if (pts !== null) {
+        gwPoints[name][result.gameweek] = (gwPoints[name][result.gameweek] || 0) + pts;
+      }
+    }
 
-    const pts = calcPoints(p.home_score, p.away_score, result.home_score, result.away_score);
-    if (pts === null) return;
+    // Track submissions (only genuinely submitted scores)
+    if (p.home_score != null && p.away_score != null) {
+      if (!subMap[p.gameweek]) subMap[p.gameweek] = {};
+      subMap[p.gameweek][name] = (subMap[p.gameweek][name] || 0) + 1;
+    }
 
-    if (!gwPoints[name]) gwPoints[name] = {};
-    gwPoints[name][gw] = (gwPoints[name][gw]||0) + pts;
-  });
-
-  // Build submission counts per GW (using predictions.gameweek since we need to show all GWs including future ones)
-  const subMap = {};
-  (preds||[]).forEach(p => {
-    const name = profileMap[p.user_id];
-    if (!name || !PLAYERS.includes(name)) return;
-    if (p.home_score == null || p.away_score == null) return;
-
-    if (!subMap[p.gameweek]) subMap[p.gameweek] = {};
-    subMap[p.gameweek][name] = (subMap[p.gameweek][name]||0) + 1;
-
-    // Also track fixture count from predictions for future GWs (where results don't exist yet)
-    if (!gwFixtureCounts[p.gameweek]) gwFixtureCounts[p.gameweek] = new Set();
-    if (typeof gwFixtureCounts[p.gameweek] === 'number') {
-      // Already have count from results, skip
-    } else {
-      const matchKey = p.match_key.replace(/^\d+_/, '');
-      gwFixtureCounts[p.gameweek].add(matchKey);
+    // Track unique fixtures for future GWs (where results don't exist yet)
+    if (!gwFixtureCounts[p.gameweek]) {
+      if (!futureGWFixtures[p.gameweek]) futureGWFixtures[p.gameweek] = new Set();
+      futureGWFixtures[p.gameweek].add(matchKey);
     }
   });
 
-  // Convert future GW fixture counts from Sets to numbers
-  Object.keys(gwFixtureCounts).forEach(gw => {
-    if (gwFixtureCounts[gw] instanceof Set) {
-      gwFixtureCounts[gw] = gwFixtureCounts[gw].size;
-    }
+  // Convert future GW fixture sets to counts
+  Object.keys(futureGWFixtures).forEach(gw => {
+    gwFixtureCounts[gw] = futureGWFixtures[gw].size;
   });
 
   section.innerHTML = `
@@ -2157,7 +2148,7 @@ async function renderAdmin() {
       </div>
       ${Object.keys(liveMatchData).map(key => {
         const live = liveMatchData[key];
-        const stored = resultMap[`${currentGW}_${key}`];
+        const stored = resultMap[key]; // Use match_key directly
         const liveScore = live.home !== null ? `${live.home}–${live.away}` : '–';
         const storedScore = stored ? `${stored.home_score}–${stored.away_score}` : 'Not written';
         const match = stored && live.home !== null && stored.home_score === live.home && stored.away_score === live.away;
