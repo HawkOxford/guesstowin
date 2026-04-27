@@ -854,6 +854,42 @@ uniqueGWsInPreds: [1,2,3,4,5,6,7,8,9,27,28,29]
 - ✅ All admin tab features work correctly for unlimited gameweeks
 - ✅ Future-proof for rest of season (GW31-38)
 
+**Additional fixes during admin tab debugging:**
+
+3. **Points by gameweek combining historical + stored data:**
+   - Problem: After implementing `user_gameweek_points` table (GW27+), admin tab only showed GW27-29 points
+   - Root cause: Code switched to reading from table only, lost HISTORICAL_GW_POINTS object (GW1-26)
+   - Fix: Combined both data sources:
+     ```javascript
+     // Initialize with historical points (GW1-26)
+     PLAYERS.forEach(name => {
+       gwPoints[name] = {};
+       const hist = HISTORICAL_GW_POINTS[name] || {};
+       Object.entries(hist).forEach(([gw, pts]) => {
+         gwPoints[name][parseInt(gw)] = pts;
+       });
+     });
+     
+     // Add stored points from user_gameweek_points table (GW27+)
+     (storedPoints||[]).forEach(sp => {
+       const name = profileMap[sp.user_id];
+       if (!name || !PLAYERS.includes(name)) return;
+       gwPoints[name][sp.gameweek] = sp.points;
+     });
+     ```
+
+4. **Live results section match_key fix:**
+   - Problem: Live results section broken after refactoring
+   - Root cause: Used old composite key `resultMap[${currentGW}_${key}]` but resultMap was refactored to use match_key only
+   - Fix: Changed to `const stored = resultMap[key];`
+   - Cleaner approach using match_key as single source of truth
+
+5. **Array mutation bug in dropdown:**
+   - Problem: GW dropdown worked but Points by Gameweek table headers were broken
+   - Root cause: `allGWs.reverse()` in dropdown HTML mutated the array, affecting table rendering later
+   - Fix: Changed to `[...allGWs].reverse()` to create a copy
+   - Prevents side effects from array mutations
+
 **Commit:** 7011145
 
 ---
