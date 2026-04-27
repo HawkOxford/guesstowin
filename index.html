@@ -1606,6 +1606,33 @@ async function savePredictionsForGW(gw) {
       const key=inp.dataset.key, side=inp.dataset.side;
       if (preds[key] && preds[key][side] !== undefined) inp.value = preds[key][side];
     });
+    // Update nudge banner immediately after save
+    updateNudgeBanner();
+  }
+}
+
+function updateNudgeBanner() {
+  // Find the nudge banner in the DOM
+  const nudgeBanner = document.querySelector('.nudge-banner');
+  if (!nudgeBanner) return; // No nudge banner on page
+
+  // Check if user has any predictions by looking at filled inputs
+  const hasAnyPreds = Array.from(document.querySelectorAll('.score-input')).some(inp => {
+    const key = inp.dataset.key;
+    const side = inp.dataset.side;
+    const otherSide = side === 'home' ? 'away' : 'home';
+    const otherInput = document.querySelector(`.score-input[data-key="${key}"][data-side="${otherSide}"]`);
+    return inp.value !== '' && otherInput && otherInput.value !== '';
+  });
+
+  if (hasAnyPreds) {
+    // Update to success state
+    nudgeBanner.className = 'nudge-banner nudge-ok';
+    nudgeBanner.innerHTML = '<span class="nudge-icon">✓</span><span>Predictions submitted — you can still edit until the deadline</span>';
+  } else {
+    // Update to warning state
+    nudgeBanner.className = 'nudge-banner';
+    nudgeBanner.innerHTML = '<span class="nudge-icon">⚠</span><span>You haven\'t submitted your predictions yet</span>';
   }
 }
 
@@ -1803,6 +1830,8 @@ async function savePredictions() {
     });
     renderSummary(preds);
     showSaveConfirmation(preds);
+    // Update nudge banner immediately after save
+    updateNudgeBanner();
   }
 }
 
