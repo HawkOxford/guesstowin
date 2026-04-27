@@ -968,15 +968,18 @@ async function estimateGWNumber(matches) {
     // This prevents skipping GWs too early (e.g., advancing on Sunday evening)
     const now = new Date();
     const ukDay = now.toLocaleDateString('en-GB', { timeZone: 'Europe/London', weekday: 'long' });
-    const ukHour = parseInt(now.toLocaleTimeString('en-GB', { timeZone: 'Europe/London', hour: '2-digit', hour12: false }));
+    const ukTime = now.toLocaleTimeString('en-GB', { timeZone: 'Europe/London', hour: '2-digit', minute: '2-digit', hour12: false });
+    const [ukHour, ukMinute] = ukTime.split(':').map(Number);
 
-    // If it's Monday or later, advance to next GW
-    // If it's Sunday or earlier, stay on completed GW (don't advance yet)
-    const shouldAdvance = ukDay === 'Monday' ||
-                          ukDay === 'Tuesday' ||
-                          ukDay === 'Wednesday' ||
-                          ukDay === 'Thursday' ||
-                          ukDay === 'Friday';
+    // Advance if:
+    // - Tuesday-Friday (already past Monday 00:01)
+    // - Monday AND time >= 00:01
+    // Stay on completed GW if:
+    // - Saturday-Sunday
+    // - Monday before 00:01
+    const isWeekday = ukDay === 'Tuesday' || ukDay === 'Wednesday' || ukDay === 'Thursday' || ukDay === 'Friday';
+    const isMondayAfter0001 = ukDay === 'Monday' && (ukHour > 0 || (ukHour === 0 && ukMinute >= 1));
+    const shouldAdvance = isWeekday || isMondayAfter0001;
 
     return shouldAdvance ? Math.min(maxCompleted + 1, 38) : maxCompleted;
   } catch (err) {
@@ -2099,10 +2102,17 @@ async function renderAdmin() {
     <div id="admin-sync-msg" style="font-size:0.8rem;color:var(--green);margin-bottom:1rem;display:none;padding:0.5rem;background:rgba(0,255,135,0.1);border-radius:6px;border:1px solid var(--green)">✓ Sync triggered</div>
 
     ${currentGW ? `
-    <div class="section-label" style="background:linear-gradient(90deg,var(--green),var(--amber));-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text">📝 GW${currentGW} Submissions</div>
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:0.5rem">
+      <div class="section-label" style="background:linear-gradient(90deg,var(--green),var(--amber));-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;margin:0">📝 Submissions</div>
+      <select id="admin-gw-selector" onchange="window.selectedAdminGW=parseInt(this.value);renderAdmin()" style="background:var(--bg3);color:var(--text);border:1px solid var(--border);border-radius:6px;padding:0.4rem 0.6rem;font-size:0.8rem;font-family:'DM Sans',sans-serif">
+        ${allGWs.reverse().map(gw => `<option value="${gw}" ${gw === (window.selectedAdminGW || currentGW) ? 'selected' : ''}>GW${gw}</option>`).join('')}
+      </select>
+    </div>
+    <div class="section-label" style="background:linear-gradient(90deg,var(--green),var(--amber));-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text">📝 GW${window.selectedAdminGW || currentGW} Submissions</div>
     <div style="background:var(--card);border:1px solid var(--border);border-radius:8px;overflow:hidden;margin-bottom:1.5rem">
       ${PLAYERS.map(name => {
-        const count = subMap[currentGW]?.[name] || 0;
+        const viewGW = window.selectedAdminGW || currentGW;
+        const count = subMap[viewGW]?.[name] || 0;
         const complete = count >= fixtureCount;
         const partial = count > 0 && !complete;
         return `<div style="display:flex;justify-content:space-between;align-items:center;padding:0.6rem 1rem;border-bottom:1px solid rgba(31,46,31,0.4)">
@@ -2142,10 +2152,11 @@ async function renderAdmin() {
       No live data cached yet — available during the weekend when matches are in progress.
     </div>`}
 
-    <div class="section-label">GW${currentGW} Submitted Scores</div>
+    <div class="section-label">GW${window.selectedAdminGW || currentGW} Submitted Scores</div>
     <div style="background:var(--card);border:1px solid var(--border);border-radius:8px;overflow:auto;margin-bottom:1.5rem">
       ${(() => {
-        const gwPreds = (preds||[]).filter(p => p.gameweek === currentGW);
+        const viewGW = window.selectedAdminGW || currentGW;
+        const gwPreds = (preds||[]).filter(p => p.gameweek === viewGW);
         // Sort match keys by kickoff time using currentMatches, fall back to alpha
         const keyTimeMap = {};
         currentMatches.forEach(m => {
@@ -2154,7 +2165,7 @@ async function renderAdmin() {
         });
         const rawKeys = [...new Set(gwPreds.map(p => p.match_key.replace(/^\d+_/, '')))];
         const matchKeys = rawKeys.sort((a,b) => (keyTimeMap[a]||0) - (keyTimeMap[b]||0));
-        if (!matchKeys.length) return '<div style="padding:1rem;color:var(--muted);font-size:0.78rem">No predictions submitted for GW' + currentGW + ' yet.</div>';
+        if (!matchKeys.length) return '<div style="padding:1rem;color:var(--muted);font-size:0.78rem">No predictions submitted for GW' + viewGW + ' yet.</div>';
         return '<table style="width:100%;border-collapse:collapse;font-size:0.72rem;min-width:500px">' +
           '<thead><tr>' +
           '<th style="padding:0.5rem 1rem;text-align:left;color:var(--muted);font-size:0.65rem;letter-spacing:0.08em;text-transform:uppercase;border-bottom:1px solid var(--border)">Player</th>' +
