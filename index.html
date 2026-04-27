@@ -2065,19 +2065,28 @@ async function renderAdmin() {
     gwPoints[name][p.gameweek] = (gwPoints[name][p.gameweek]||0) + pts;
   });
 
-  // Submission counts per GW
+  // Submission counts per GW and fixture counts per GW
   const subMap = {};
+  const gwFixtureCounts = {};
   (preds||[]).forEach(p => {
     const name = profileMap[p.user_id];
     if (!name || !PLAYERS.includes(name)) return;
-    // Only count genuinely submitted scores (non-null and non-undefined)
-    // Use == to catch both null and undefined
+
+    // Track unique fixtures per GW
+    if (!gwFixtureCounts[p.gameweek]) gwFixtureCounts[p.gameweek] = new Set();
+    const matchKey = p.match_key.replace(/^\d+_/, '');
+    gwFixtureCounts[p.gameweek].add(matchKey);
+
+    // Count submissions (only genuinely submitted scores)
     if (p.home_score == null || p.away_score == null) return;
     if (!subMap[p.gameweek]) subMap[p.gameweek] = {};
     subMap[p.gameweek][name] = (subMap[p.gameweek][name]||0) + 1;
   });
 
-  const fixtureCount = currentMatches.length || 8;
+  // Convert fixture counts from Sets to numbers
+  Object.keys(gwFixtureCounts).forEach(gw => {
+    gwFixtureCounts[gw] = gwFixtureCounts[gw].size;
+  });
 
   section.innerHTML = `
     <div style="text-align:center;margin-bottom:2rem">
@@ -2113,7 +2122,8 @@ async function renderAdmin() {
       ${PLAYERS.map(name => {
         const viewGW = window.selectedAdminGW || currentGW;
         const count = subMap[viewGW]?.[name] || 0;
-        const complete = count >= fixtureCount;
+        const fixtureCount = gwFixtureCounts[viewGW] || 0;
+        const complete = count >= fixtureCount && fixtureCount > 0;
         const partial = count > 0 && !complete;
         return `<div style="display:flex;justify-content:space-between;align-items:center;padding:0.6rem 1rem;border-bottom:1px solid rgba(31,46,31,0.4)">
           <span style="font-size:0.85rem;font-weight:500">${name}</span>
@@ -2157,23 +2167,19 @@ async function renderAdmin() {
       ${(() => {
         const viewGW = window.selectedAdminGW || currentGW;
         const gwPreds = (preds||[]).filter(p => p.gameweek === viewGW);
-        // Sort match keys by kickoff time using currentMatches, fall back to alpha
-        const keyTimeMap = {};
-        currentMatches.forEach(m => {
-          const key = (cleanTeamName(m.homeTeam?.name)||'') + '_' + (cleanTeamName(m.awayTeam?.name)||'');
-          keyTimeMap[key] = new Date(m.utcDate).getTime();
-        });
+
+        // Get unique match keys and sort alphabetically
         const rawKeys = [...new Set(gwPreds.map(p => p.match_key.replace(/^\d+_/, '')))];
-        const matchKeys = rawKeys.sort((a,b) => (keyTimeMap[a]||0) - (keyTimeMap[b]||0));
+        const matchKeys = rawKeys.sort();
+
         if (!matchKeys.length) return '<div style="padding:1rem;color:var(--muted);font-size:0.78rem">No predictions submitted for GW' + viewGW + ' yet.</div>';
+
         return '<table style="width:100%;border-collapse:collapse;font-size:0.72rem;min-width:500px">' +
           '<thead><tr>' +
           '<th style="padding:0.5rem 1rem;text-align:left;color:var(--muted);font-size:0.65rem;letter-spacing:0.08em;text-transform:uppercase;border-bottom:1px solid var(--border)">Player</th>' +
           matchKeys.map(key => {
-            const m = currentMatches.find(m => (cleanTeamName(m.homeTeam?.name)||'')+'_'+(cleanTeamName(m.awayTeam?.name)||'') === key);
-            const time = m ? new Date(m.utcDate).toLocaleDateString('en-GB',{timeZone:'Europe/London',weekday:'short',day:'numeric',month:'short'}) + ' ' + formatMatchTime(m.utcDate) : key;
             const parts = key.split('_');
-            return '<th style="padding:0.5rem 0.5rem;text-align:center;color:var(--muted);font-size:0.6rem;letter-spacing:0.05em;text-transform:uppercase;border-bottom:1px solid var(--border)">' + parts[0] + ' v ' + parts.slice(1).join('_') + '<br><span style="font-weight:400;color:var(--muted);text-transform:none;letter-spacing:0">' + (m ? formatMatchTime(m.utcDate) : '') + '</span></th>';
+            return '<th style="padding:0.5rem 0.5rem;text-align:center;color:var(--muted);font-size:0.6rem;letter-spacing:0.05em;text-transform:uppercase;border-bottom:1px solid var(--border)">' + parts[0] + ' v ' + parts.slice(1).join('_') + '</th>';
           }).join('') +
           '</tr></thead><tbody>' +
           PLAYERS.map(name => {
