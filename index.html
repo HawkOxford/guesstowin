@@ -2015,7 +2015,7 @@ async function renderAdmin() {
     { data: storedPoints }
   ] = await Promise.all([
     sb.from('profiles').select('id,player_name'),
-    sb.from('predictions').select('user_id,gameweek,match_key,home_score,away_score').range(0, 19999),
+    sb.from('predictions').select('user_id,gameweek,match_key,home_score,away_score', { count: 'exact' }).range(0, 19999),
     sb.from('results').select('gameweek,match_key,home_score,away_score,status').eq('status','finished').range(0, 9999),
     sb.from('user_gameweek_points').select('user_id,gameweek,points').range(0, 9999)
   ]);
@@ -2029,7 +2029,8 @@ async function renderAdmin() {
     results: (results||[]).length,
     storedPoints: (storedPoints||[]).length,
     uniqueGWsInPreds: [...new Set((preds||[]).map(p => p.gameweek))].sort((a,b) => a-b),
-    gw30Preds: (preds||[]).filter(p => p.gameweek === 30).length
+    gw30Preds: (preds||[]).filter(p => p.gameweek === 30).length,
+    samplePredGWs: (preds||[]).slice(0, 20).map(p => p.gameweek)
   });
 
   // Get all GWs (ensure we include 1-28 even if not all in Supabase yet)
@@ -2057,13 +2058,19 @@ async function renderAdmin() {
     gwFixtureCounts[r.gameweek]++;
   });
 
-  // PASS 2: Build points map from stored points table (NOT calculated)
+  // PASS 2: Build points map - combine historical (GW1-26) + stored (GW27+)
   const gwPoints = {};
+
+  // Initialize with historical points (GW1-26)
   PLAYERS.forEach(name => {
     gwPoints[name] = {};
+    const hist = HISTORICAL_GW_POINTS[name] || {};
+    Object.entries(hist).forEach(([gw, pts]) => {
+      gwPoints[name][parseInt(gw)] = pts;
+    });
   });
 
-  // Load points from user_gameweek_points table
+  // Add stored points from user_gameweek_points table (GW27+)
   (storedPoints||[]).forEach(sp => {
     const name = profileMap[sp.user_id];
     if (!name || !PLAYERS.includes(name)) return;
