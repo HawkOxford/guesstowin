@@ -2011,15 +2011,26 @@ async function renderAdmin() {
   const [
     { data: profiles },
     { data: preds },
-    { data: results }
+    { data: results },
+    { data: storedPoints }
   ] = await Promise.all([
     sb.from('profiles').select('id,player_name'),
-    sb.from('predictions').select('user_id,gameweek,match_key,home_score,away_score').range(0, 19999), // Load ALL predictions (Supabase ignores .limit() over 1000)
-    sb.from('results').select('gameweek,match_key,home_score,away_score,status').eq('status','finished').range(0, 9999)
+    sb.from('predictions').select('user_id,gameweek,match_key,home_score,away_score').range(0, 19999),
+    sb.from('results').select('gameweek,match_key,home_score,away_score,status').eq('status','finished').range(0, 9999),
+    sb.from('user_gameweek_points').select('user_id,gameweek,points').range(0, 9999)
   ]);
 
   const profileMap = {};
   (profiles||[]).forEach(p => profileMap[p.id] = p.player_name);
+
+  console.log('Admin data loaded:', {
+    profiles: (profiles||[]).length,
+    predictions: (preds||[]).length,
+    results: (results||[]).length,
+    storedPoints: (storedPoints||[]).length,
+    uniqueGWsInPreds: [...new Set((preds||[]).map(p => p.gameweek))].sort((a,b) => a-b),
+    gw30Preds: (preds||[]).filter(p => p.gameweek === 30).length
+  });
 
   // Get all GWs (ensure we include 1-28 even if not all in Supabase yet)
   const allGWs = [...new Set([
@@ -2046,35 +2057,28 @@ async function renderAdmin() {
     gwFixtureCounts[r.gameweek]++;
   });
 
-  // PASS 2: Build points and submission maps from predictions
+  // PASS 2: Build points map from stored points table (NOT calculated)
   const gwPoints = {};
-  const subMap = {};
-  const futureGWFixtures = {}; // Track unique fixtures for future GWs
-
-  // Initialize gwPoints with historical data (GW1-26)
   PLAYERS.forEach(name => {
     gwPoints[name] = {};
-    const hist = HISTORICAL_GW_POINTS[name] || {};
-    Object.entries(hist).forEach(([gw, pts]) => {
-      gwPoints[name][parseInt(gw)] = pts;
-    });
   });
 
-  // Process all predictions
+  // Load points from user_gameweek_points table
+  (storedPoints||[]).forEach(sp => {
+    const name = profileMap[sp.user_id];
+    if (!name || !PLAYERS.includes(name)) return;
+    gwPoints[name][sp.gameweek] = sp.points;
+  });
+
+  // PASS 3: Build submission counts and fixture counts from predictions
+  const subMap = {};
+  const futureGWFixtures = {};
+
   (preds||[]).forEach(p => {
     const name = profileMap[p.user_id];
     if (!name || !PLAYERS.includes(name)) return;
 
     const matchKey = p.match_key.replace(/^\d+_/, '');
-    const result = resultMap[matchKey];
-
-    // Calculate points if result exists (GW27+)
-    if (result && result.gameweek >= 27) {
-      const pts = calcPoints(p.home_score, p.away_score, result.home_score, result.away_score);
-      if (pts !== null) {
-        gwPoints[name][result.gameweek] = (gwPoints[name][result.gameweek] || 0) + pts;
-      }
-    }
 
     // Track submissions (only genuinely submitted scores)
     if (p.home_score != null && p.away_score != null) {
@@ -2120,7 +2124,7 @@ async function renderAdmin() {
     <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:0.5rem">
       <div class="section-label" style="background:linear-gradient(90deg,var(--green),var(--amber));-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;margin:0">📝 Submissions</div>
       <select id="admin-gw-selector" onchange="window.selectedAdminGW=parseInt(this.value);renderAdmin()" style="background:var(--bg3);color:var(--text);border:1px solid var(--border);border-radius:6px;padding:0.4rem 0.6rem;font-size:0.8rem;font-family:'DM Sans',sans-serif">
-        ${allGWs.reverse().map(gw => `<option value="${gw}" ${gw === (window.selectedAdminGW || currentGW) ? 'selected' : ''}>GW${gw}</option>`).join('')}
+        ${[...allGWs].reverse().map(gw => `<option value="${gw}" ${gw === (window.selectedAdminGW || currentGW) ? 'selected' : ''}>GW${gw}</option>`).join('')}
       </select>
     </div>
     <div class="section-label" style="background:linear-gradient(90deg,var(--green),var(--amber));-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text">📝 GW${window.selectedAdminGW || currentGW} Submissions</div>
