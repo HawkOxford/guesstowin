@@ -71,7 +71,7 @@
 
   /* Leaderboard */
   .leaderboard-card { background: var(--card); border: 1px solid var(--border); border-radius: 10px; overflow: hidden; max-width: 600px; }
-  .lb-row { display: grid; grid-template-columns: 36px 1fr 52px 72px; align-items: center; gap: 0.75rem; padding: 0.85rem 1.1rem; border-bottom: 1px solid var(--border); transition: background 0.15s; }
+  .lb-row { display: grid; grid-template-columns: 36px 1fr auto; align-items: center; gap: 0.75rem; padding: 0.85rem 0 0.85rem 1.1rem; border-bottom: 1px solid var(--border); transition: background 0.15s; }
   .lb-row:last-child { border-bottom: none; }
   .lb-row:hover { background: rgba(0,230,118,0.03); }
   .lb-row.top-1 { background: rgba(255,213,79,0.05); }
@@ -83,7 +83,7 @@
   .top-3 .lb-rank { color: var(--bronze); }
   .lb-row:not(.top-1):not(.top-2):not(.top-3) .lb-rank { color: var(--muted); }
   .lb-name { font-weight: 500; font-size: 0.9rem; }
-  .lb-pts-col { text-align: right; display: flex; flex-direction: column; align-items: flex-end; gap: 4px; }
+  .lb-pts-col { text-align: right; display: flex; flex-direction: column; align-items: flex-end; gap: 4px; padding-right: 1.1rem; }
   .lb-points { font-family: 'Bebas Neue', sans-serif; font-size: 1.5rem; color: var(--green); line-height: 1; letter-spacing: 0.02em; }
   .lb-gw { font-size: 0.65rem; color: var(--muted); background: rgba(255,213,79,0.08); padding: 2px 6px; border-radius: 4px; white-space: nowrap; }
   .tied-badge { font-size: 0.58rem; background: rgba(0,230,118,0.1); color: var(--green); border-radius: 3px; padding: 1px 4px; font-weight: 700; letter-spacing: 0.05em; margin-left: 4px; }
@@ -708,8 +708,8 @@ async function renderLeaderboard() {
         const isWeekendDay = ukDayLb === 'Saturday' || ukDayLb === 'Sunday';
         const showLive = isLiveWeekend && isWeekendDay;
         return `<div class="lb-row ${rankClass(p.rank)}">
-          <div class="lb-rank" style="display:flex;align-items:center;gap:2px">
-            <span>${p.rank}</span>${arrowStr}
+          <div class="lb-rank">
+            ${p.rank}
           </div>
           <div class="lb-name">${isGWLeader?`<span style="font-size:0.62rem;background:rgba(255,213,79,0.15);color:var(--gold);border-radius:3px;padding:1px 5px;margin-right:4px;font-weight:700;letter-spacing:0.03em">👑 GW${gwLeaderGW}</span>`:''}${p.name}
             ${tied?'<span class="tied-badge">TIE</span>':''}
