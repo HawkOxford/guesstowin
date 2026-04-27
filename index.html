@@ -708,8 +708,8 @@ async function renderLeaderboard() {
         const isWeekendDay = ukDayLb === 'Saturday' || ukDayLb === 'Sunday';
         const showLive = isLiveWeekend && isWeekendDay;
         return `<div class="lb-row ${rankClass(p.rank)}">
-          <div class="lb-rank">
-            ${p.rank}
+          <div class="lb-rank" style="display:flex;align-items:center;gap:2px">
+            <span>${p.rank}</span>${showLive ? arrowStr : ''}
           </div>
           <div class="lb-name">${isGWLeader?`<span style="font-size:0.62rem;background:rgba(255,213,79,0.15);color:var(--gold);border-radius:3px;padding:1px 5px;margin-right:4px;font-weight:700;letter-spacing:0.03em">👑 GW${gwLeaderGW}</span>`:''}${p.name}
             ${tied?'<span class="tied-badge">TIE</span>':''}
@@ -963,7 +963,22 @@ async function estimateGWNumber(matches) {
     if (!completedGWs.length) return 1;
 
     const maxCompleted = completedGWs[0];
-    return Math.min(maxCompleted + 1, 38);
+
+    // Only advance to next GW on Monday 00:01 UK time or later
+    // This prevents skipping GWs too early (e.g., advancing on Sunday evening)
+    const now = new Date();
+    const ukDay = now.toLocaleDateString('en-GB', { timeZone: 'Europe/London', weekday: 'long' });
+    const ukHour = parseInt(now.toLocaleTimeString('en-GB', { timeZone: 'Europe/London', hour: '2-digit', hour12: false }));
+
+    // If it's Monday or later, advance to next GW
+    // If it's Sunday or earlier, stay on completed GW (don't advance yet)
+    const shouldAdvance = ukDay === 'Monday' ||
+                          ukDay === 'Tuesday' ||
+                          ukDay === 'Wednesday' ||
+                          ukDay === 'Thursday' ||
+                          ukDay === 'Friday';
+
+    return shouldAdvance ? Math.min(maxCompleted + 1, 38) : maxCompleted;
   } catch (err) {
     console.error('GW detection failed:', err);
     return 1;
