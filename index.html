@@ -2156,6 +2156,17 @@ async function renderAdmin() {
     <div style="background:var(--card);border:1px solid var(--border);border-radius:8px;overflow:auto;margin-bottom:1.5rem">
       ${(() => {
         const viewGW = window.selectedAdminGW || currentGW;
+        console.log('Admin predictions debug:', {
+          viewGW,
+          viewGWType: typeof viewGW,
+          currentGW,
+          currentGWType: typeof currentGW,
+          totalPreds: (preds||[]).length,
+          gw30Preds: (preds||[]).filter(p => p.gameweek === 30).length,
+          gw30PredsLoose: (preds||[]).filter(p => p.gameweek == 30).length,
+          samplePred: (preds||[])[0],
+          uniqueGWs: [...new Set((preds||[]).map(p => p.gameweek))].sort((a,b) => a-b)
+        });
         const gwPreds = (preds||[]).filter(p => p.gameweek === viewGW);
         // Sort match keys by kickoff time using currentMatches, fall back to alpha
         const keyTimeMap = {};
