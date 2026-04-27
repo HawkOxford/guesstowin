@@ -570,6 +570,25 @@ Benefits:
 
 ## Recent Changes — 27 April 2026
 
+**Summary:** Fixed critical admin tab pagination bug preventing GW30+ predictions from loading, plus several other admin tab improvements.
+
+**Issues resolved:**
+1. **Admin tab pagination missing** - Only loading 1000 predictions (Supabase limit)
+2. **Points by gameweek incomplete** - Missing historical GW1-26 data
+3. **Live results section broken** - Using wrong match_key format
+4. **Array mutation bug** - GW dropdown breaking table headers
+
+**Impact:**
+- ✅ Admin tab now loads ALL predictions (GW1-38, unlimited)
+- ✅ GW30 predictions now appear in admin tab
+- ✅ Points by gameweek shows complete GW1-30 data
+- ✅ All admin tab features working correctly
+- ✅ Future-proof for rest of season
+
+**Commits:** 7011145 (pagination), 28f4caa (docs), d524f39 (additional fixes docs)
+
+---
+
 ### Points Storage System — Server-Side Calculation ✅
 
 **Date:** 26-27 April 2026
