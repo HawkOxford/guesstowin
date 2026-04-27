@@ -568,6 +568,221 @@ Benefits:
 
 ---
 
+## Recent Changes — 27 April 2026
+
+### Points Storage System — Server-Side Calculation ✅
+
+**Date:** 26-27 April 2026
+
+**Problem:** Five players (Glurk, Richard, Teflon, Gaz, Craig) missing GW29 points on leaderboard, while five others showed correct totals. Root cause was on-the-fly points calculation in frontend with matching/lookup issues.
+
+**Solution:** Implemented proper server-side points storage system with Edge Function calculation.
+
+**Architecture:**
+- **New table:** `user_gameweek_points` — stores calculated points per user per gameweek
+- **Edge Function:** `calculate-points` — calculates and upserts points using service role key
+- **Auto-refresh:** Points recalculated every 60 seconds during live GWs
+- **Backfill:** Historical points (GW27-current) calculated on page load
+
+**Implementation:**
+
+1. **Database table** (`migrations/create_points_table.sql`):
+   ```sql
+   CREATE TABLE user_gameweek_points (
+     user_id uuid REFERENCES profiles(id) ON DELETE CASCADE,
+     gameweek int NOT NULL,
+     points int NOT NULL DEFAULT 0,
+     updated_at timestamptz DEFAULT now(),
+     PRIMARY KEY (user_id, gameweek)
+   );
+   -- RLS: publicly readable, Edge Function writes with service role key
+   ```
+
+2. **Edge Function** (`supabase/functions/calculate-points/index.ts`):
+   - Accepts `{ gameweek, liveResults }` payload
+   - Fetches predictions and results from database
+   - Calculates points using `calcPoints()` function
+   - Upserts to `user_gameweek_points` table
+   - Bypasses RLS using `SUPABASE_SERVICE_ROLE_KEY`
+
+3. **Client integration** (`index.html`):
+   - `calculateAndStorePoints(gw)` — calls Edge Function (line ~2298)
+   - Called after `syncLiveResults()` every 60s during live weekends
+   - `backfillPoints()` — runs once on page load for GW27-current (line ~2348)
+   - Leaderboard reads from stored points instead of calculating (line 503-727)
+
+**Files created:**
+- `migrations/create_points_table.sql` — Table schema
+- `migrations/update_points_rls.sql` — Drops restrictive write policy
+- `supabase/functions/calculate-points/index.ts` — Edge Function
+
+**Files modified:**
+- `index.html` — Added calculateAndStorePoints(), integrated with sync, updated leaderboard
+
+**Result:**
+- ✅ All players show correct total points
+- ✅ Points update every 60 seconds automatically
+- ✅ Historical points backfilled correctly
+- ✅ Secure server-side calculation (no RLS bypass in client code)
+
+**Commits:** b964b31, b87a003, 10ca6b4
+
+---
+
+### Leaderboard Formatting — Professional Layout ✅
+
+**Date:** 27 April 2026
+
+**Problem:** Leaderboard had poor visual hierarchy with stacked points/winnings and misaligned columns. Rank arrows showed at all times (even during the week).
+
+**Changes applied:**
+
+1. **CSS Grid Layout** (lines 74-88):
+   ```css
+   .lb-row { 
+     display: grid; 
+     grid-template-columns: 36px 1fr auto; 
+     align-items: center; 
+     gap: 0.75rem; 
+   }
+   .lb-pts-col { 
+     text-align: right; 
+     display: flex; 
+     flex-direction: column; 
+     align-items: flex-end; 
+     padding-right: 1.1rem; 
+   }
+   .lb-points { 
+     font-family: 'Bebas Neue', sans-serif; 
+     font-size: 1.5rem; 
+     color: var(--green); 
+     letter-spacing: 0.02em; 
+   }
+   .lb-gw { 
+     font-size: 0.65rem; 
+     background: rgba(255,213,79,0.08); 
+     padding: 2px 6px; 
+     border-radius: 4px; 
+   }
+   ```
+
+2. **Right-aligned points** — Points and winnings columns now properly right-aligned with no gap
+
+3. **Conditional rank arrows** (line 712):
+   ```javascript
+   ${showLive ? arrowStr : ''}
+   ```
+   - Arrows ONLY show during live weekends (Saturday/Sunday)
+   - Hidden during the week when no matches are happening
+
+**Files modified:**
+- `index.html` — CSS and conditional arrow rendering
+
+**Result:**
+- ✅ Professional grid layout
+- ✅ Proper visual hierarchy (points prominent, winnings subtle)
+- ✅ No gaps between columns and edge
+- ✅ Rank arrows only during live GWs
+
+**Commits:** 659383b, 5ef84e5
+
+---
+
+### GW Advancement Timing Fix ✅
+
+**Date:** 27 April 2026
+
+**Problem:** Gameweek detection was advancing too early. Last week it skipped GWs prematurely because it advanced as soon as all matches finished (could be Sunday evening).
+
+**Root cause:** `estimateGWNumber()` advanced to next GW immediately when `finishedCount >= totalCount`, regardless of day of week.
+
+**Fix applied** (lines 934-971):
+```javascript
+// Only advance to next GW on Monday 00:01 UK time or later
+const now = new Date();
+const ukDay = now.toLocaleDateString('en-GB', { 
+  timeZone: 'Europe/London', 
+  weekday: 'long' 
+});
+const shouldAdvance = ukDay === 'Monday' ||
+                      ukDay === 'Tuesday' ||
+                      ukDay === 'Wednesday' ||
+                      ukDay === 'Thursday' ||
+                      ukDay === 'Friday';
+return shouldAdvance ? Math.min(maxCompleted + 1, 38) : maxCompleted;
+```
+
+**Behavior:**
+- **Saturday/Sunday:** Stays on completed GW even if all matches are finished
+- **Monday-Friday:** Advances to next GW
+- Prevents premature advancement during the weekend
+
+**Files modified:**
+- `index.html` — estimateGWNumber() function
+
+**Result:**
+- ✅ GW only advances on Monday UK time
+- ✅ No more premature skipping
+- ✅ Stays on correct GW throughout the weekend
+
+**Commit:** dd17720
+
+---
+
+### Nudge Banner Immediate Update ✅
+
+**Date:** 27 April 2026
+
+**Problem:** After submitting predictions, the success message "Predictions submitted — you can still edit until the deadline" only appeared after refreshing the page.
+
+**Root cause:** Save functions showed temporary "✓ Saved!" message but didn't update the main nudge banner at the top of the page.
+
+**Fix applied:**
+
+1. **New function** `updateNudgeBanner()` (lines ~1613-1632):
+   ```javascript
+   function updateNudgeBanner() {
+     const nudgeBanner = document.querySelector('.nudge-banner');
+     if (!nudgeBanner) return;
+     
+     // Check if user has any complete predictions
+     const hasAnyPreds = Array.from(document.querySelectorAll('.score-input'))
+       .some(inp => {
+         const key = inp.dataset.key;
+         const side = inp.dataset.side;
+         const otherSide = side === 'home' ? 'away' : 'home';
+         const otherInput = document.querySelector(
+           `.score-input[data-key="${key}"][data-side="${otherSide}"]`
+         );
+         return inp.value !== '' && otherInput && otherInput.value !== '';
+       });
+     
+     if (hasAnyPreds) {
+       nudgeBanner.className = 'nudge-banner nudge-ok';
+       nudgeBanner.innerHTML = '✓ Predictions submitted — you can still edit until the deadline';
+     } else {
+       nudgeBanner.className = 'nudge-banner';
+       nudgeBanner.innerHTML = '⚠ You haven\'t submitted your predictions yet';
+     }
+   }
+   ```
+
+2. **Integrated into save functions:**
+   - `savePredictionsForGW(gw)` — calls `updateNudgeBanner()` after successful save (line ~1610)
+   - `savePredictions()` — calls `updateNudgeBanner()` after successful save (line ~1807)
+
+**Files modified:**
+- `index.html` — Added updateNudgeBanner() function and integrated into both save functions
+
+**Result:**
+- ✅ Nudge banner updates immediately after save
+- ✅ No refresh required to see submission status
+- ✅ Better user feedback
+
+**Commit:** 5409fc5
+
+---
+
 Pending Code Improvements (low priority — do in quiet week)
 Safe to do anytime
 Remove `renderLeaderboardGuest` one-liner (just calls `renderLeaderboard` directly)
