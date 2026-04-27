@@ -783,6 +783,81 @@ return shouldAdvance ? Math.min(maxCompleted + 1, 38) : maxCompleted;
 
 ---
 
+### Admin Tab Pagination Fix — GW30+ Predictions Loading ✅
+
+**Date:** 27 April 2026
+
+**Problem:** Admin tab not showing GW30 predictions despite them being saved correctly in Supabase. Dropdown menu only showed GW1-29. GW submissions section showed incorrect counts. Points by gameweek table missing data.
+
+**Root cause:** Supabase has a 1000-row default limit per query. The admin tab was only loading 1000 predictions total, which covered approximately GW1-29 but not GW30 onwards. The `.range(0, 19999)` approach didn't work because Supabase still enforces the 1000-row limit per query.
+
+**Console evidence:**
+```
+predictions: 1000
+gw30Preds: 0
+uniqueGWsInPreds: [1,2,3,4,5,6,7,8,9,27,28,29]
+```
+
+**Solution:** Implemented proper pagination helper that loads data in 1000-row chunks until all rows are retrieved.
+
+**Implementation:**
+
+1. **Created `fetchAllRows()` helper** (inside `renderAdmin()` function, line ~2006):
+   ```javascript
+   async function fetchAllRows(table, columns, filters = []) {
+     const allRows = [];
+     let from = 0;
+     const pageSize = 1000;
+
+     while (true) {
+       let query = sb.from(table).select(columns).range(from, from + pageSize - 1);
+       filters.forEach(([method, ...args]) => {
+         query = query[method](...args);
+       });
+
+       const { data, error } = await query;
+       if (error || !data || data.length === 0) break;
+
+       allRows.push(...data);
+       if (data.length < pageSize) break; // Last page
+       from += pageSize;
+     }
+
+     return allRows;
+   }
+   ```
+
+2. **Updated data loading to use pagination:**
+   ```javascript
+   const [profiles, preds, results, storedPoints] = await Promise.all([
+     fetchAllRows('profiles', 'id,player_name'),
+     fetchAllRows('predictions', 'user_id,gameweek,match_key,home_score,away_score'),
+     fetchAllRows('results', 'gameweek,match_key,home_score,away_score,status', [['eq', 'status', 'finished']]),
+     fetchAllRows('user_gameweek_points', 'user_id,gameweek,points')
+   ]);
+   ```
+
+**How pagination works:**
+- Starts at row 0, fetches 1000 rows
+- Concatenates results into `allRows` array
+- Continues fetching next 1000 rows until less than 1000 returned (indicating last page)
+- Returns complete dataset regardless of size
+
+**Files modified:**
+- `index.html` — Added fetchAllRows() helper, updated renderAdmin() data loading
+
+**Result:**
+- ✅ GW30 predictions now load correctly in admin tab
+- ✅ Dropdown menu includes all gameweeks (GW1-30+)
+- ✅ Submissions section shows accurate counts for all gameweeks
+- ✅ Points by gameweek table displays complete data
+- ✅ All admin tab features work correctly for unlimited gameweeks
+- ✅ Future-proof for rest of season (GW31-38)
+
+**Commit:** 7011145
+
+---
+
 Pending Code Improvements (low priority — do in quiet week)
 Safe to do anytime
 Remove `renderLeaderboardGuest` one-liner (just calls `renderLeaderboard` directly)
